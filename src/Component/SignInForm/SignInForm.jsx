@@ -3,11 +3,30 @@ import React, {useState} from "react";
 import {useNavigate} from "react-router-dom";
 import {Button} from "@/components/ui/button.tsx";
 import InputField from "../Utils/InputField";
-import {API_URL} from "@/config.js";
-import {toast} from "react-toastify";  // ← import toast
+import {API_URL as RAW_API_URL} from "@/config.js";
+import {toast} from "react-toastify";
+import axios from "axios";
+
+// Normalize API base, avoid trailing slash issues
+const API_URL = String(RAW_API_URL || "").trim().replace(/\/+$/, "");
+const join = (base, path) => `${base}/${String(path || "").replace(/^\/+/, "")}`;
+
+// small helpers for cookies
+const setCookie = (name, value, minutes = 10, sameSite = "Lax") => {
+    if (!value) return;
+    const maxAge = Math.max(1, Math.floor(minutes * 60)); // seconds
+    const isSecure = window.location.protocol === "https:";
+    document.cookie =
+        `${name}=${encodeURIComponent(value)}; Max-Age=${maxAge}; Path=/; SameSite=${sameSite}` +
+        (isSecure ? "; Secure" : "");
+};
+
+const deleteCookie = (name) => {
+    document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
+};
 
 const SignInForm = ({setIsAuthenticated}) => {
-    const [email, setEmail] = useState("");         // ✅ using email
+    const [email, setEmail] = useState(""); // using email
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
@@ -19,34 +38,75 @@ const SignInForm = ({setIsAuthenticated}) => {
         setError("");
 
         try {
-            const response = await fetch(`${API_URL}auth/login`, {
+            const resp = await fetch(join(API_URL, "/auth/login"), {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({email, password}),
             });
 
-            const data = await response.json();
+            const data = await resp.json();
 
-            if (response.ok) {
-                // save user data
-                localStorage.setItem("userData", JSON.stringify(data));
-                // also save credentials for local-old-password check
-                localStorage.setItem(
-                    "userCredentials", JSON.stringify({email, password})
-                );
-                // show success toast
+            if (resp.ok) {
+                // Combine user + tokens so refresher can read refresh_token from userData
+                const combinedUserData = {
+                    ...(data.user ?? {}),
+                    access_token: data.access_token || null,
+                    refresh_token: data.refresh_token || null,
+                };
+
+                // Store userData in BOTH storages (back-compat with your utilities)
+                sessionStorage.setItem("userData", JSON.stringify(combinedUserData));
+                localStorage.setItem("userData", JSON.stringify(combinedUserData));
+
+                // Keep credentials ephemeral (optional)
+                sessionStorage.setItem("userCredentials", JSON.stringify({email, password}));
+
+                // Set axios default Authorization for subsequent axios calls
+                if (data.access_token) {
+                    axios.defaults.headers.common.Authorization = `Bearer ${data.access_token}`;
+                } else {
+                    delete axios.defaults.headers.common.Authorization;
+                }
+
+                // Cookies:
+                // access_token ~10 minutes
+                if (data.access_token) {
+                    setCookie("access_token", data.access_token, 10, "Lax");
+                } else {
+                    deleteCookie("access_token");
+                }
+                // refresh_token ~7 days (use SameSite=Lax for same-site; switch to None if cross-site + HTTPS)
+                if (data.refresh_token) {
+                    setCookie("refresh_token", data.refresh_token, 7 * 24 * 60, "Lax");
+                } else {
+                    deleteCookie("refresh_token");
+                }
+
                 toast.success("Logged in successfully!");
-
                 setIsAuthenticated(true);
                 navigate("/menu");
             } else {
-                setError(data.message || "Invalid credentials");
-                toast.error(data.message || "Invalid credentials");  // optional error toast
+                const msg = data.detail || data.message || "Invalid credentials";
+                setError(msg);
+                deleteCookie("access_token");
+                deleteCookie("refresh_token");
+                sessionStorage.removeItem("userCredentials");
+                localStorage.removeItem("userData");
+                sessionStorage.removeItem("userData");
+                delete axios.defaults.headers.common.Authorization;
                 setIsAuthenticated(false);
+                toast.error(msg);
             }
         } catch (err) {
-            setError("Something went wrong. Please try again.");
-            toast.error("Something went wrong. Please try again.");  // error toast
+            const msg = "Something went wrong. Please try again.";
+            setError(msg);
+            deleteCookie("access_token");
+            deleteCookie("refresh_token");
+            sessionStorage.removeItem("userCredentials");
+            localStorage.removeItem("userData");
+            sessionStorage.removeItem("userData");
+            delete axios.defaults.headers.common.Authorization;
+            toast.error(msg);
         } finally {
             setLoading(false);
         }
@@ -58,9 +118,7 @@ const SignInForm = ({setIsAuthenticated}) => {
                 onSubmit={handleSubmit}
                 className="max-w-sm mx-auto p-6 bg-transparent rounded-lg flex flex-col gap-4 w-[350px]"
             >
-                <h2 className="text-xl font-semibold text-center text-gray-700">
-                    Sign In
-                </h2>
+                <h2 className="text-xl font-semibold text-center text-gray-700">Sign In</h2>
 
                 <InputField
                     label="Email"
@@ -76,9 +134,7 @@ const SignInForm = ({setIsAuthenticated}) => {
                     onChange={(e) => setPassword(e.target.value)}
                 />
 
-                {error && (
-                    <p className="text-red-500 text-sm text-center">{error}</p>
-                )}
+                {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
                 <Button
                     type="submit"

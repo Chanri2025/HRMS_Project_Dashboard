@@ -3,19 +3,37 @@ import React, {useState, useEffect} from "react";
 import {useNavigate} from "react-router-dom";
 import menuItems from "@/Component/Menu/menuConfig.jsx";
 
+// Normalize like the backend: spaces/underscores -> hyphens, uppercase
+const normalizeRole = (v) =>
+    (v || "")
+        .toString()
+        .trim()
+        .replace(/[ _]/g, "-")
+        .toUpperCase();
+
 const Menu = () => {
-    const [role, setRole] = useState("Employee");
+    const [role, setRole] = useState("EMPLOYEE"); // store normalized
     const navigate = useNavigate();
 
     useEffect(() => {
-        const userData = JSON.parse(localStorage.getItem("userData"));
-        if (userData) {
-            setRole(userData.role);
+        try {
+            // Prefer sessionStorage; fallback to localStorage for backward compat
+            const raw = sessionStorage.getItem("userData");
+            if (raw) {
+                const userData = JSON.parse(raw);
+                // backend might return role or roles[]
+                const rawRole =
+                    userData?.role ||
+                    (Array.isArray(userData?.roles) && userData.roles.length ? userData.roles[0] : null);
+                if (rawRole) setRole(normalizeRole(rawRole));
+            }
+        } catch (e) {
+            console.error("Failed to parse userData:", e);
         }
     }, []);
 
     const filteredItems = menuItems.filter((item) =>
-        item.allowedRoles.includes(role)
+        (item.allowedRoles || []).some((r) => normalizeRole(r) === role)
     );
 
     return (
@@ -26,12 +44,12 @@ const Menu = () => {
                         key={item.key}
                         onClick={() => navigate(`/menu/${item.key}`)}
                         className={`
-              ${item.bgClass} 
-              dark:bg-gray-800/80 backdrop-blur-md 
-              p-6 rounded-lg 
-              shadow hover:shadow-lg 
-              cursor-pointer text-center 
-              transition-all 
+              ${item.bgClass}
+              dark:bg-gray-800/80 backdrop-blur-md
+              p-6 rounded-lg
+              shadow hover:shadow-lg
+              cursor-pointer text-center
+              transition-all
               flex flex-col items-center gap-3
             `}
                     >

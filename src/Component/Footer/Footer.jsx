@@ -6,14 +6,17 @@ import {FaEnvelope, FaPhoneAlt} from "react-icons/fa";
 
 export default function Footer() {
     return (
-        <footer className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-4">
+        <footer className="bg-gradient-to-r from-green-400 to-green-400 text-white py-4">
             <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
                     {/* Logo & Tagline */}
                     <div className="flex flex-col items-center md:items-start text-center md:text-left space-y-2">
                         <img src={Logo} alt="Logo" className="w-28 sm:w-32 mx-auto md:mx-0"/>
                         <p className="text-gray-200 leading-snug text-sm">
-                            With 10–25 years of experience, our professionals excel in large-scale projects.
+                            Appynitty is a Tech-Driven Innovative Company that provides sustainable and robust
+                            technological solutions for Solid Waste Management (SWM). Our technologies contribute
+                            immensely toward environmental protection and make the cities cleaner, greener and
+                            healthier.
                         </p>
                     </div>
 
@@ -48,13 +51,14 @@ export default function Footer() {
                         </h4>
                         <ul className="mt-2 space-y-1 text-sm text-gray-200">
                             <li className="flex justify-center sm:justify-start items-center gap-1">
-                                <FaEnvelope className="text-white"/> contact-us@smscmep.com
+                                <FaEnvelope className="text-white"/> info@appynitty.com
                             </li>
                             <li className="flex justify-center sm:justify-start items-center gap-1">
-                                <FaPhoneAlt className="text-white"/> +91 79080 00345
+                                <FaPhoneAlt className="text-white"/> +91 92091 00900
                             </li>
                             <li className="text-center sm:text-left">
-                                1st Floor, Purbachal Canal South Road, Kolkata: 78
+                                1st Floor, K.B Chambers Plot No - 62, South Canal Gokulpeth, Dharampeth,Nagpur,
+                                Maharashtra: 440010
                             </li>
                         </ul>
                     </div>
@@ -65,7 +69,7 @@ export default function Footer() {
                             Our Office
                         </h4>
                         <p className="mt-2 text-gray-200 text-sm leading-snug max-w-xs mx-auto sm:mx-0">
-                            We’re located in the heart of Kolkata, ready to support you all week long.
+                            We’re located in the heart of Nagpur, ready to support you all week long.
                         </p>
                     </div>
                 </div>
@@ -74,10 +78,10 @@ export default function Footer() {
                     <div className="text-center text-gray-300 text-xs">
                         &copy; {new Date().getFullYear()}{" "}
                         <Link
-                            to="https://www.smscmep.com"
+                            to="https://www.appynitty.com/"
                             className="underline hover:text-white transition-colors duration-200"
                         >
-                            SMSC
+                            Appynitty Communications Pvt. Ltd.
                         </Link>
                         . All rights reserved.
                     </div>

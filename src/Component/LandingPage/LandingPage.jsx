@@ -8,7 +8,7 @@ const LandingPage = ({ setIsAuthenticated }) => {
       {/* Centered Login Form */}
       <div className="bg-white p-10 rounded-lg shadow-lg border w-[450px] text-center">
         <h1 className="text-2xl font-bold mb-4">
-          Welcome to SM Service Portal
+          Welcome to Appynitty Portal
         </h1>
 
         {/* Centered Logo */}

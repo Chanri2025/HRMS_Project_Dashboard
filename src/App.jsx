@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, {useState, useEffect} from "react";
+import React, {useState, useEffect, useRef} from "react";
 import {
     BrowserRouter as Router,
     Routes,
@@ -27,6 +27,13 @@ import ComingSoon from "@/Component/Utils/ComingSoon.jsx";
 import ResetPasswordForm from "@/Component/Employee-Details/Reset-Password/Page.jsx";
 import Footer from "@/Component/Footer/Footer.jsx";
 import {ToastContainer} from "react-toastify";
+
+import axios from "axios";
+import {startTokenRefresher} from "@/utils/tokenRefresher";
+import {API_URL as RAW_API_URL} from "@/config.js";
+
+// Normalize API base once (trims and removes trailing slash)
+const API_BASE_URL = String(RAW_API_URL || "").trim().replace(/\/+$/, "");
 
 function AppRoutes({isAuthenticated, setIsAuthenticated}) {
     const location = useLocation();
@@ -61,21 +68,13 @@ function AppRoutes({isAuthenticated, setIsAuthenticated}) {
                 <Route
                     path="/menu"
                     element={
-                        isAuthenticated ? (
-                            <Menu/>
-                        ) : (
-                            <Navigate to="/signin" replace/>
-                        )
+                        isAuthenticated ? <Menu/> : <Navigate to="/signin" replace/>
                     }
                 />
                 <Route
                     path="/menu/:menuKey"
                     element={
-                        isAuthenticated ? (
-                            <SubMenu/>
-                        ) : (
-                            <Navigate to="/signin" replace/>
-                        )
+                        isAuthenticated ? <SubMenu/> : <Navigate to="/signin" replace/>
                     }
                 />
 
@@ -204,7 +203,7 @@ function AppRoutes({isAuthenticated, setIsAuthenticated}) {
             </Routes>
 
             {/* Persistent footer */}
-            <Footer/>
+            {/*<Footer/>*/}
         </>
     );
 }
@@ -214,11 +213,48 @@ export default function App() {
         () => JSON.parse(localStorage.getItem("isAuthenticated")) || false
     );
 
+    // Keep axios Authorization in sync on load (useful when refreshing page)
     useEffect(() => {
-        localStorage.setItem(
-            "isAuthenticated",
-            JSON.stringify(isAuthenticated)
-        );
+        try {
+            const raw =
+                sessionStorage.getItem("userData") || localStorage.getItem("userData");
+            if (raw) {
+                const {access_token} = JSON.parse(raw) || {};
+                if (access_token) {
+                    axios.defaults.headers.common.Authorization = `Bearer ${access_token}`;
+                }
+            }
+        } catch (e) {
+            console.warn("Failed to set initial Authorization header:", e);
+        }
+    }, []);
+
+    // Persist auth flag
+    useEffect(() => {
+        localStorage.setItem("isAuthenticated", JSON.stringify(isAuthenticated));
+    }, [isAuthenticated]);
+
+    // ⬇️ Start/stop background token refresher (every 10 min) based on auth state
+    const stopRefresherRef = useRef(null);
+    useEffect(() => {
+        // stop any previous refresher
+        if (stopRefresherRef.current) {
+            stopRefresherRef.current();
+            stopRefresherRef.current = null;
+        }
+
+        if (isAuthenticated) {
+            // runs once immediately, then every 10 minutes in background
+            stopRefresherRef.current = startTokenRefresher(API_BASE_URL);
+        }
+
+        // on unmount, always cleanup
+        return () => {
+            if (stopRefresherRef.current) {
+                stopRefresherRef.current();
+                stopRefresherRef.current = null;
+            }
+        };
     }, [isAuthenticated]);
 
     return (
