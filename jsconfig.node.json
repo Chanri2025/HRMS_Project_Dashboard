@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+
+    "allowJs": true,
+    "checkJs": false,
+    "skipLibCheck": true,
+    "noEmit": true,
+
+    "strict": false,
+    "types": ["node"],
+    "resolveJsonModule": true,
+
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": [
+    "vite.config.*",
+    "vitest.config.*",
+    "eslint.config.*",
+    "postcss.config.*",
+    "tailwind.config.*",
+    "src/env.d.ts"
+  ],
+  "exclude": ["node_modules"]
+}
