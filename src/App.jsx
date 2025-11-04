@@ -14,6 +14,10 @@ import Attendance from "@/pages/Attendance";
 import NotFound from "@/pages/NotFound";
 import LandingPage from "@/Component/auth/LandingPage";
 import Org from "@/Component/Organisation/Page";
+import DepartmentsPage from "@/Component/Organisation/DepartmentsPage";
+import SubDepartmentsPage from "@/Component/Organisation/SubDepartmentsPage.jsx";
+import DesignationsPage from "@/Component/Organisation/DesignationsPage.jsx";
+import QuickAddPage from "@/Component/Organisation/QuickAddPage.jsx";
 
 import AppBreadcrumbs from "@/Utils/AppBreadcrumbs.jsx";
 import {useEffect, useMemo, useState} from "react";
@@ -118,7 +122,13 @@ function App() {
                             <Route path="/board" element={<Board/>}/>
                             <Route path="/calendar" element={<Calendar/>}/>
                             <Route path="/attendance" element={<Attendance/>}/>
+
                             <Route path="/team" element={<Org/>}/>
+                            <Route path="/team/departments" element={<DepartmentsPage/>} />
+                            <Route path="/team/org/sub-departments" element={<SubDepartmentsPage/>}/>
+                            <Route path="/team/org/designations" element={<DesignationsPage/>}/>
+                            <Route path="/team/org/quick-add" element={<QuickAddPage/>}/>
+
                             <Route path="*" element={<NotFound/>}/>
                         </Routes>
                     </main>

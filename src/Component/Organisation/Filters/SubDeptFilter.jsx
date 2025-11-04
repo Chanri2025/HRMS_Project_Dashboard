@@ -1,6 +1,6 @@
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import React from "react";
-import {safeArray} from "@/Component/Organisation/arrays.js";
+import {safeArray, SENTINEL_ALL} from "@/Utils/arrays.js";
 
 export default function SubDeptFilter({value, onChange, options, disabled, loading}) {
     return (
