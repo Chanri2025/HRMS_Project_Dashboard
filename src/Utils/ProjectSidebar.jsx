@@ -52,7 +52,7 @@ const menuItems = [
             {title: "Organisation Tree", url: "/team/org"},
             {title: "Departments", url: "/team/departments"},
             {title: "Sub - Departments", url: "/team/org/sub-departments"},
-            {title: "Designations", url: "/team/org/sub-departments"},
+            {title: "Designations", url: "/team/org/designations"},
             {title: "Quick Add", url: "/team/org/quick-add"},
         ],
     },

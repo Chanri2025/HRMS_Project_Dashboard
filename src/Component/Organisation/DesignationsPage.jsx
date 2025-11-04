@@ -1,91 +1,123 @@
 import React, {useMemo, useState} from "react";
-import axios from "axios";
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
 import {safeArray, toArray} from "@/Utils/arrays.js";
+import {http, getUserCtx} from "@/lib/http";
 import DesignationSection from "./sections/DesignationSection.jsx";
 
+/* ----------------------------- helpers ----------------------------- */
 const qk = {
     depts: ["org", "departments"],
-    subDeptsAll: ["org", "sub-departments"],
-    subDeptsByDept: (dept_id) => ["org", "sub-departments", {dept_id}],
+    subDeptsAll: ["org", "sub-departments"],          // ← single source of truth
     designationsAll: ["org", "designations"],
-    designationsBy: (dept_id, sub_dept_id) => ["org", "designations", {dept_id, sub_dept_id}],
 };
-const fetcher = async (url, params) => {
+
+const fetchList = async (url) => {
     try {
-        const {data} = await axios.get(url, {params});
-        return data;
+        const {data} = await http.get(url);
+        return Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
     } catch {
         return [];
     }
 };
 
+// client-side filter
+function filterDesignations(list, deptId, subDeptId) {
+    let out = safeArray(list);
+    if (deptId) out = out.filter((x) => Number(x.dept_id) === Number(deptId));
+    if (subDeptId) out = out.filter((x) => Number(x.sub_dept_id) === Number(subDeptId));
+    return out;
+}
+
 export default function DesignationsPage() {
     const qc = useQueryClient();
+    const {userId} = getUserCtx();
 
     const [deptFilter, setDeptFilter] = useState("");
     const [subDeptFilter, setSubDeptFilter] = useState("");
+
     const [designationForm, setDesignationForm] = useState({
         dept_id: "",
         sub_dept_id: "",
         designation_name: "",
         description: "",
-        created_by: "system",
+        created_by: Number(userId) || 0,
     });
 
+    /* ------------------------------ queries ------------------------------ */
     const {data: departments = [], isLoading: loadingDepts} = useQuery({
         queryKey: qk.depts,
-        queryFn: () => fetcher("/org/departments"),
+        queryFn: () => fetchList("org/departments"),
         select: toArray,
     });
 
-    const {data: subDepartments = [], isLoading: loadingSubs} = useQuery({
-        queryKey: deptFilter ? qk.subDeptsByDept(Number(deptFilter)) : qk.subDeptsAll,
-        queryFn: () => fetcher("/org/sub-departments", deptFilter ? {dept_id: Number(deptFilter)} : undefined),
+    // 🚩 Always fetch ALL sub-departments once
+    const {data: subDepartmentsAll = [], isLoading: loadingSubs} = useQuery({
+        queryKey: qk.subDeptsAll,
+        queryFn: () => fetchList("org/sub-departments"),
         select: toArray,
     });
 
-    const {data: designations = [], isLoading: loadingDesignations} = useQuery({
-        queryKey: deptFilter || subDeptFilter
-            ? qk.designationsBy(deptFilter ? Number(deptFilter) : undefined, subDeptFilter ? Number(subDeptFilter) : undefined)
-            : qk.designationsAll,
-        queryFn: () => fetcher("/org/designations", {
-            ...(deptFilter ? {dept_id: Number(deptFilter)} : {}),
-            ...(subDeptFilter ? {sub_dept_id: Number(subDeptFilter)} : {}),
-        }),
+    const {data: allDesignations = [], isLoading: loadingDesignations} = useQuery({
+        queryKey: qk.designationsAll,
+        queryFn: () => fetchList("org/designations"),
         select: toArray,
     });
 
-    const {data: subDeptsForDesignation = []} = useQuery({
-        enabled: Boolean(designationForm.dept_id),
-        queryKey: qk.subDeptsByDept(Number(designationForm.dept_id || 0)),
-        queryFn: () => fetcher("/org/sub-departments", {dept_id: Number(designationForm.dept_id)}),
-        select: toArray,
-    });
+    const designations = useMemo(
+        () => filterDesignations(allDesignations, deptFilter, subDeptFilter),
+        [allDesignations, deptFilter, subDeptFilter]
+    );
 
+    /* ----------------------------- options ----------------------------- */
     const deptOptions = useMemo(
         () => safeArray(departments).map((d) => ({value: String(d.dept_id), label: d.dept_name})),
         [departments]
     );
+
+    // Filter sub-dept dropdown by selected dept (for the right-side filters)
+    const subDeptsForFilter = useMemo(
+        () =>
+            deptFilter
+                ? safeArray(subDepartmentsAll).filter((s) => Number(s.dept_id) === Number(deptFilter))
+                : safeArray(subDepartmentsAll),
+        [subDepartmentsAll, deptFilter]
+    );
     const subDeptOptions = useMemo(
-        () => safeArray(subDepartments).map((s) => ({value: String(s.sub_dept_id), label: s.sub_dept_name})),
-        [subDepartments]
+        () => subDeptsForFilter.map((s) => ({value: String(s.sub_dept_id), label: s.sub_dept_name})),
+        [subDeptsForFilter]
     );
 
+    // For the Add Designation form
+    const subDeptsForDesignation = useMemo(
+        () =>
+            designationForm.dept_id
+                ? safeArray(subDepartmentsAll).filter((s) => Number(s.dept_id) === Number(designationForm.dept_id))
+                : [],
+        [subDepartmentsAll, designationForm.dept_id]
+    );
+
+    /* ----------------------------- mutations ----------------------------- */
     const mCreateDesignation = useMutation({
-        mutationFn: async (payload) => (await axios.post("/org/designations", payload)).data,
-        onSuccess: (data, payload) => {
+        mutationFn: async (payload) =>
+            (await http.post("org/designations", {
+                ...payload,
+                dept_id: Number(payload.dept_id),
+                sub_dept_id: Number(payload.sub_dept_id),
+                created_by: Number(userId) || 0,
+            })).data,
+        onSuccess: (data) => {
             toast.success(`Designation "${data.designation_name}" created`);
             qc.invalidateQueries({queryKey: qk.designationsAll});
-            qc.invalidateQueries({
-                queryKey: qk.designationsBy(Number(payload.dept_id), Number(payload.sub_dept_id)),
-            });
             setDesignationForm((s) => ({...s, designation_name: "", description: ""}));
         },
-        onError: (err) => toast.error(err?.response?.data?.detail || "Failed to create designation"),
+        onError: (err) => {
+            const d = err?.response?.data;
+            toast.error(d?.detail || d?.message || err?.message || "Failed to create designation");
+        },
     });
 
+    /* -------------------------------- UI --------------------------------- */
     return (
         <div className="p-4 md:p-6 max-w-7xl mx-auto">
             <h2 className="text-2xl font-bold tracking-tight mb-1">Designations</h2>
@@ -93,7 +125,8 @@ export default function DesignationsPage() {
 
             <DesignationSection
                 departments={departments}
-                subDepartments={subDepartments}
+                // ⬇️ pass ALL sub-departments so names always resolve in the table
+                subDepartments={subDepartmentsAll}
                 deptOptions={deptOptions}
                 subDeptOptions={subDeptOptions}
                 subDeptsForDesignation={subDeptsForDesignation}
@@ -108,17 +141,7 @@ export default function DesignationsPage() {
                 designationForm={designationForm}
                 setDesignationForm={setDesignationForm}
                 onCreate={() => mCreateDesignation.mutate({...designationForm})}
-                onRefresh={() =>
-                    qc.invalidateQueries({
-                        queryKey:
-                            deptFilter || subDeptFilter
-                                ? qk.designationsBy(
-                                    deptFilter ? Number(deptFilter) : undefined,
-                                    subDeptFilter ? Number(subDeptFilter) : undefined
-                                )
-                                : qk.designationsAll,
-                    })
-                }
+                onRefresh={() => qc.invalidateQueries({queryKey: qk.designationsAll})}
             />
         </div>
     );

@@ -1,25 +1,29 @@
+// src/pages/SubDepartmentsPage.jsx
 import React, {useMemo, useState} from "react";
-import axios from "axios";
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
 import {safeArray, toArray} from "@/Utils/arrays.js";
+import {http} from "@/lib/http";
 import SubDepartmentSection from "./sections/SubDepartmentSection.jsx";
 
 const qk = {
     depts: ["org", "departments"],
     subDeptsAll: ["org", "sub-departments"],
-    subDeptsByDept: (dept_id) => ["org", "sub-departments", {dept_id}],
-};
-const fetcher = async (url, params) => {
-    try {
-        const {data} = await axios.get(url, {params});
-        return data;
-    } catch {
-        return [];
-    }
+    subDeptsByDept: (dept_id) => ["org", "sub-departments", dept_id],
 };
 
-const SubDepartmentsPage = () => {
+const fetchDepartments = async () => (await http.get("/org/departments")).data;
+
+/* ✅ use /org/sub-departments/:dept_id if filter present */
+const fetchSubDepartments = async (deptFilter) => {
+    const url = deptFilter
+        ? `/org/sub-departments/${deptFilter}`
+        : `/org/sub-departments`;
+    const {data} = await http.get(url);
+    return data;
+};
+
+export default function SubDepartmentsPage() {
     const qc = useQueryClient();
     const [deptFilter, setDeptFilter] = useState("");
     const [subDeptForm, setSubDeptForm] = useState({
@@ -31,13 +35,13 @@ const SubDepartmentsPage = () => {
 
     const {data: departments = [], isLoading: loadingDepts} = useQuery({
         queryKey: qk.depts,
-        queryFn: () => fetcher("/org/departments"),
+        queryFn: fetchDepartments,
         select: toArray,
     });
 
     const {data: subDepartments = [], isLoading: loadingSubs} = useQuery({
-        queryKey: deptFilter ? qk.subDeptsByDept(Number(deptFilter)) : qk.subDeptsAll,
-        queryFn: () => fetcher("/org/sub-departments", deptFilter ? {dept_id: Number(deptFilter)} : undefined),
+        queryKey: deptFilter ? qk.subDeptsByDept(deptFilter) : qk.subDeptsAll,
+        queryFn: () => fetchSubDepartments(deptFilter),
         select: toArray,
     });
 
@@ -47,20 +51,26 @@ const SubDepartmentsPage = () => {
     );
 
     const mCreateSubDept = useMutation({
-        mutationFn: async (payload) => (await axios.post("/org/sub-departments", payload)).data,
+        mutationFn: async (payload) => (await http.post("/org/sub-departments", payload)).data,
         onSuccess: (data, payload) => {
-            toast.success(`Sub-Department "${data.sub_dept_name}" created`);
+            toast.success(`Sub-Department “${data.sub_dept_name}” created`);
             qc.invalidateQueries({queryKey: qk.subDeptsAll});
-            if (payload.dept_id) qc.invalidateQueries({queryKey: qk.subDeptsByDept(Number(payload.dept_id))});
+            if (payload.dept_id)
+                qc.invalidateQueries({queryKey: qk.subDeptsByDept(payload.dept_id)});
             setSubDeptForm((s) => ({...s, sub_dept_name: "", description: ""}));
         },
-        onError: (err) => toast.error(err?.response?.data?.detail || "Failed to create sub-department"),
+        onError: (err) =>
+            toast.error(err?.response?.data?.detail || "Failed to create sub-department"),
     });
 
     return (
         <div className="p-4 md:p-6 max-w-7xl mx-auto">
-            <h2 className="text-2xl font-bold tracking-tight mb-1">Sub-Departments</h2>
-            <p className="text-muted-foreground mb-6">Create and manage sub-departments.</p>
+            <div className="mb-6">
+                <h2 className="text-2xl font-bold tracking-tight">Sub-Departments</h2>
+                <p className="text-muted-foreground">
+                    Create and manage sub-departments under existing departments.
+                </p>
+            </div>
 
             <SubDepartmentSection
                 departments={departments}
@@ -75,11 +85,11 @@ const SubDepartmentsPage = () => {
                 onCreate={() => mCreateSubDept.mutate({...subDeptForm})}
                 onRefresh={() =>
                     qc.invalidateQueries({
-                        queryKey: deptFilter ? qk.subDeptsByDept(Number(deptFilter)) : qk.subDeptsAll,
+                        queryKey: deptFilter ? qk.subDeptsByDept(deptFilter) : qk.subDeptsAll,
                     })
                 }
+                creating={mCreateSubDept.isPending}
             />
         </div>
     );
 }
-export default SubDepartmentsPage;
