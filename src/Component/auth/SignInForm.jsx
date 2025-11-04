@@ -59,9 +59,8 @@ const SignInForm = ({ setIsAuthenticated }) => {
           refresh_token: data.refresh_token || null,
         };
 
-        // persist (both for backward compat)
+        // persist to sessionStorage only
         sessionStorage.setItem("userData", JSON.stringify(combinedUserData));
-        localStorage.setItem("userData", JSON.stringify(combinedUserData));
 
         // ephemeral creds (optional)
         sessionStorage.setItem(
@@ -76,7 +75,7 @@ const SignInForm = ({ setIsAuthenticated }) => {
           delete axios.defaults.headers.common.Authorization;
         }
 
-        // cookies
+        // cookies for tokens (short-lived access, longer refresh)
         if (data.access_token)
           setCookie("access_token", data.access_token, 10, "Lax");
         else deleteCookie("access_token");
@@ -87,14 +86,13 @@ const SignInForm = ({ setIsAuthenticated }) => {
 
         toast.success("Logged in successfully!");
         setIsAuthenticated(true);
-        navigate("/"); // <-- go to your app home (valid route)
+        navigate("/"); // app home
       } else {
         const msg = data.detail || data.message || "Invalid credentials";
         setError(msg);
         deleteCookie("access_token");
         deleteCookie("refresh_token");
         sessionStorage.removeItem("userCredentials");
-        localStorage.removeItem("userData");
         sessionStorage.removeItem("userData");
         delete axios.defaults.headers.common.Authorization;
         setIsAuthenticated(false);
@@ -106,7 +104,6 @@ const SignInForm = ({ setIsAuthenticated }) => {
       deleteCookie("access_token");
       deleteCookie("refresh_token");
       sessionStorage.removeItem("userCredentials");
-      localStorage.removeItem("userData");
       sessionStorage.removeItem("userData");
       delete axios.defaults.headers.common.Authorization;
       toast.error(msg);
@@ -132,7 +129,7 @@ const SignInForm = ({ setIsAuthenticated }) => {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@company.com"
+            placeholder="you@bigv.com"
             required
           />
         </div>

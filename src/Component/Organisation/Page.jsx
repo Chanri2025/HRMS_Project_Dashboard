@@ -1,0 +1,304 @@
+// src/pages/Page.jsx
+import React, {useMemo, useState} from "react";
+import axios from "axios";
+import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
+import {toast} from "sonner";
+import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from "@/components/ui/tabs";
+import DepartmentSection from "./DepartmentSection.jsx";
+import SubDepartmentSection from "./SubDepartmentSection.jsx";
+import DesignationSection from "./DesignationSection.jsx";
+import QuickAddSection from "./QuickAddSection.jsx";
+import DeptFilter from "./filters/DeptFilter.jsx";
+import SubDeptFilter from "./filters/SubDeptFilter.jsx";
+import LoadingDot from "./LoadingDot.jsx";
+
+import { safeArray, toArray, SENTINEL_ALL } from "@/Component/Organisation/arrays.js";
+
+const qk = {
+    depts: ["org", "departments"],
+    subDeptsAll: ["org", "sub-departments"],
+    subDeptsByDept: (dept_id) => ["org", "sub-departments", {dept_id}],
+    designationsAll: ["org", "designations"],
+    designationsBy: (dept_id, sub_dept_id) => [
+        "org",
+        "designations",
+        {dept_id, sub_dept_id},
+    ],
+};
+
+// Return [] on error so UI never crashes while auth refreshes, etc.
+const fetcher = async (url, params) => {
+    try {
+        const {data} = await axios.get(url, {params});
+        return data;
+    } catch {
+        return [];
+    }
+};
+
+
+export default function Page() {
+    const qc = useQueryClient();
+
+    // Filters (for list panes)
+    const [deptFilter, setDeptFilter] = useState("");
+    const [subDeptFilter, setSubDeptFilter] = useState("");
+
+    // Forms state
+    const [deptForm, setDeptForm] = useState({
+        dept_name: "",
+        description: "",
+        created_by: "system",
+    });
+    const [subDeptForm, setSubDeptForm] = useState({
+        dept_id: "",
+        sub_dept_name: "",
+        description: "",
+        created_by: "system",
+    });
+    const [designationForm, setDesignationForm] = useState({
+        dept_id: "",
+        sub_dept_id: "",
+        designation_name: "",
+        description: "",
+        created_by: "system",
+    });
+    const [quickForm, setQuickForm] = useState({
+        dept_name: "",
+        dept_description: "",
+        sub_dept_name: "",
+        sub_dept_description: "",
+        designation_name: "",
+        designation_description: "",
+        created_by: "system",
+    });
+
+    /* ------------------------------ queries ------------------------------ */
+    const {data: departments = [], isLoading: loadingDepts} = useQuery({
+        queryKey: qk.depts,
+        queryFn: () => fetcher("/org/departments"),
+        select: toArray,
+    });
+
+    const {data: subDepartments = [], isLoading: loadingSubDepts} = useQuery({
+        queryKey: deptFilter ? qk.subDeptsByDept(Number(deptFilter)) : qk.subDeptsAll,
+        queryFn: () =>
+            fetcher(
+                "/org/sub-departments",
+                deptFilter ? {dept_id: Number(deptFilter)} : undefined
+            ),
+        select: toArray,
+    });
+
+    const {data: designations = [], isLoading: loadingDesignations} = useQuery({
+        queryKey:
+            deptFilter || subDeptFilter
+                ? qk.designationsBy(
+                    deptFilter ? Number(deptFilter) : undefined,
+                    subDeptFilter ? Number(subDeptFilter) : undefined
+                )
+                : qk.designationsAll,
+        queryFn: () =>
+            fetcher("/org/designations", {
+                ...(deptFilter ? {dept_id: Number(deptFilter)} : {}),
+                ...(subDeptFilter ? {sub_dept_id: Number(subDeptFilter)} : {}),
+            }),
+        select: toArray,
+    });
+
+    // SubDept options for Designation form dropdown
+    const {data: subDeptsForDesignation = []} = useQuery({
+        enabled: Boolean(designationForm.dept_id),
+        queryKey: qk.subDeptsByDept(Number(designationForm.dept_id || 0)),
+        queryFn: () =>
+            fetcher("/org/sub-departments", {
+                dept_id: Number(designationForm.dept_id),
+            }),
+        select: toArray,
+    });
+
+    /* ----------------------------- options ------------------------------- */
+    const deptOptions = useMemo(
+        () =>
+            safeArray(departments).map((d) => ({
+                value: String(d.dept_id),
+                label: d.dept_name,
+            })),
+        [departments]
+    );
+
+    const subDeptOptions = useMemo(
+        () =>
+            safeArray(subDepartments).map((s) => ({
+                value: String(s.sub_dept_id),
+                label: s.sub_dept_name,
+            })),
+        [subDepartments]
+    );
+
+    /* ----------------------------- mutations ----------------------------- */
+    const mCreateDept = useMutation({
+        mutationFn: async (payload) => (await axios.post("/org/departments", payload)).data,
+        onSuccess: (data) => {
+            toast.success(`Department "${data.dept_name}" created`);
+            qc.invalidateQueries({queryKey: qk.depts});
+            setDeptForm((s) => ({...s, dept_name: "", description: ""}));
+        },
+        onError: (err) => toast.error(err?.response?.data?.detail || "Failed to create department"),
+    });
+
+    const mCreateSubDept = useMutation({
+        mutationFn: async (payload) => (await axios.post("/org/sub-departments", payload)).data,
+        onSuccess: (data, payload) => {
+            toast.success(`Sub-Department "${data.sub_dept_name}" created`);
+            qc.invalidateQueries({queryKey: qk.subDeptsAll});
+            if (payload.dept_id)
+                qc.invalidateQueries({
+                    queryKey: qk.subDeptsByDept(Number(payload.dept_id)),
+                });
+            setSubDeptForm((s) => ({...s, sub_dept_name: "", description: ""}));
+        },
+        onError: (err) =>
+            toast.error(err?.response?.data?.detail || "Failed to create sub-department"),
+    });
+
+    const mCreateDesignation = useMutation({
+        mutationFn: async (payload) => (await axios.post("/org/designations", payload)).data,
+        onSuccess: (data, payload) => {
+            toast.success(`Designation "${data.designation_name}" created`);
+            qc.invalidateQueries({queryKey: qk.designationsAll});
+            qc.invalidateQueries({
+                queryKey: qk.designationsBy(Number(payload.dept_id), Number(payload.sub_dept_id)),
+            });
+            setDesignationForm((s) => ({...s, designation_name: "", description: ""}));
+        },
+        onError: (err) =>
+            toast.error(err?.response?.data?.detail || "Failed to create designation"),
+    });
+
+    const mQuickAdd = useMutation({
+        mutationFn: async (payload) => (await axios.post("/org/add-all", payload)).data,
+        onSuccess: ({dept, sub_dept, designation}) => {
+            toast.success(
+                `Added: ${dept.dept_name} → ${sub_dept.sub_dept_name} → ${designation.designation_name}`
+            );
+            qc.invalidateQueries({queryKey: qk.depts});
+            qc.invalidateQueries({queryKey: qk.subDeptsAll});
+            qc.invalidateQueries({queryKey: qk.designationsAll});
+            setQuickForm({
+                dept_name: "",
+                dept_description: "",
+                sub_dept_name: "",
+                sub_dept_description: "",
+                designation_name: "",
+                designation_description: "",
+                created_by: "system",
+            });
+        },
+        onError: (err) => toast.error(err?.response?.data?.detail || "Failed to add all"),
+    });
+
+    /* ------------------------------- UI ---------------------------------- */
+    return (
+        <div className="p-4 md:p-6 max-w-7xl mx-auto">
+            <div className="mb-4">
+                <h2 className="text-2xl font-bold tracking-tight">Organization</h2>
+                <p className="text-muted-foreground">
+                    Manage Departments, Sub-Departments, and Designations.
+                </p>
+            </div>
+
+            <Tabs defaultValue="departments" className="space-y-6">
+                <TabsList>
+                    <TabsTrigger value="departments">Departments</TabsTrigger>
+                    <TabsTrigger value="sub-departments">Sub-Departments</TabsTrigger>
+                    <TabsTrigger value="designations">Designations</TabsTrigger>
+                    <TabsTrigger value="quick-add">Quick Add</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="departments" className="space-y-6">
+                    <DepartmentSection
+                        departments={departments}
+                        loading={loadingDepts}
+                        deptForm={deptForm}
+                        setDeptForm={setDeptForm}
+                        onCreate={() => mCreateDept.mutate(deptForm)}
+                        onRefresh={() => qInvalidate(qc, qk.depts)}
+                    />
+                </TabsContent>
+
+                <TabsContent value="sub-departments" className="space-y-6">
+                    <SubDepartmentSection
+                        departments={departments}
+                        deptOptions={deptOptions}
+                        subDepartments={subDepartments}
+                        loadingDepts={loadingDepts}
+                        loadingSubs={loadingSubDepts}
+                        deptFilter={deptFilter}
+                        setDeptFilter={setDeptFilter}
+                        subDeptForm={subDeptForm}
+                        setSubDeptForm={setSubDeptForm}
+                        onCreate={() => mCreateSubDept.mutate({...subDeptForm})}
+                        onRefresh={() =>
+                            qInvalidate(
+                                qc,
+                                deptFilter ? qk.subDeptsByDept(Number(deptFilter)) : qk.subDeptsAll
+                            )
+                        }
+                    />
+                </TabsContent>
+
+                <TabsContent value="designations" className="space-y-6">
+                    <DesignationSection
+                        departments={departments}
+                        subDepartments={subDepartments}
+                        deptOptions={deptOptions}
+                        subDeptOptions={subDeptOptions}
+                        subDeptsForDesignation={subDeptsForDesignation}
+                        designations={designations}
+                        loadingDepts={loadingDepts}
+                        loadingSubs={loadingSubDepts}
+                        loadingDesignations={loadingDesignations}
+                        deptFilter={deptFilter}
+                        setDeptFilter={setDeptFilter}
+                        subDeptFilter={subDeptFilter}
+                        setSubDeptFilter={setSubDeptFilter}
+                        designationForm={designationForm}
+                        setDesignationForm={setDesignationForm}
+                        onCreate={() => mCreateDesignation.mutate({...designationForm})}
+                        onRefresh={() =>
+                            qInvalidate(
+                                qc,
+                                deptFilter || subDeptFilter
+                                    ? qk.designationsBy(
+                                        deptFilter ? Number(deptFilter) : undefined,
+                                        subDeptFilter ? Number(subDeptFilter) : undefined
+                                    )
+                                    : qk.designationsAll
+                            )
+                        }
+                    />
+                </TabsContent>
+
+                <TabsContent value="quick-add" className="space-y-6">
+                    <QuickAddSection
+                        quickForm={quickForm}
+                        setQuickForm={setQuickForm}
+                        onSubmit={() => mQuickAdd.mutate(quickForm)}
+                        pending={mQuickAdd.isPending}
+                    />
+                </TabsContent>
+            </Tabs>
+        </div>
+    );
+}
+
+/* --------------------------- tiny util --------------------------- */
+function qInvalidate(qc, key) {
+    qc.invalidateQueries({queryKey: key});
+}
