@@ -3,12 +3,13 @@ import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
 import {safeArray, toArray} from "@/Utils/arrays.js";
 import {http, getUserCtx} from "@/lib/http";
+import {errText} from "@/lib/errText";
 import DesignationSection from "./sections/DesignationSection.jsx";
 
 /* ----------------------------- helpers ----------------------------- */
 const qk = {
     depts: ["org", "departments"],
-    subDeptsAll: ["org", "sub-departments"],          // ← single source of truth
+    subDeptsAll: ["org", "sub-departments"],
     designationsAll: ["org", "designations"],
 };
 
@@ -51,7 +52,6 @@ export default function DesignationsPage() {
         select: toArray,
     });
 
-    // 🚩 Always fetch ALL sub-departments once
     const {data: subDepartmentsAll = [], isLoading: loadingSubs} = useQuery({
         queryKey: qk.subDeptsAll,
         queryFn: () => fetchList("org/sub-departments"),
@@ -75,7 +75,6 @@ export default function DesignationsPage() {
         [departments]
     );
 
-    // Filter sub-dept dropdown by selected dept (for the right-side filters)
     const subDeptsForFilter = useMemo(
         () =>
             deptFilter
@@ -88,7 +87,6 @@ export default function DesignationsPage() {
         [subDeptsForFilter]
     );
 
-    // For the Add Designation form
     const subDeptsForDesignation = useMemo(
         () =>
             designationForm.dept_id
@@ -100,20 +98,55 @@ export default function DesignationsPage() {
     /* ----------------------------- mutations ----------------------------- */
     const mCreateDesignation = useMutation({
         mutationFn: async (payload) =>
-            (await http.post("org/designations", {
-                ...payload,
-                dept_id: Number(payload.dept_id),
-                sub_dept_id: Number(payload.sub_dept_id),
-                created_by: Number(userId) || 0,
-            })).data,
+            (
+                await http.post("org/designations", {
+                    ...payload,
+                    dept_id: Number(payload.dept_id),
+                    sub_dept_id: Number(payload.sub_dept_id),
+                    created_by: Number(userId) || 0,
+                })
+            ).data,
         onSuccess: (data) => {
             toast.success(`Designation "${data.designation_name}" created`);
             qc.invalidateQueries({queryKey: qk.designationsAll});
             setDesignationForm((s) => ({...s, designation_name: "", description: ""}));
         },
+        onError: (err) => toast.error(errText(err, "Failed to create designation")),
+    });
+
+    // PUT /org/designations/:id
+    const mUpdateDesignation = useMutation({
+        mutationFn: async ({designation_id, payload}) =>
+            (
+                await http.put(`org/designations/${Number(designation_id)}`, {
+                    ...payload,
+                    dept_id: Number(payload.dept_id),
+                    sub_dept_id: Number(payload.sub_dept_id),
+                    // updated_by: Number(userId) || 0, // uncomment if backend expects this
+                })
+            ).data,
+        onSuccess: (data, vars) => {
+            toast.success(`Updated “${data?.designation_name || vars?.payload?.designation_name}”`);
+            qc.invalidateQueries({queryKey: qk.designationsAll});
+        },
+        onError: (err) => toast.error(errText(err, "Failed to update designation")),
+    });
+
+    // DELETE /org/designations/:id
+    const [deletingId, setDeletingId] = useState(null);
+    const mDeleteDesignation = useMutation({
+        mutationFn: async ({designation_id}) => {
+            setDeletingId(Number(designation_id));
+            return (await http.delete(`org/designations/${Number(designation_id)}`)).data;
+        },
+        onSuccess: () => {
+            toast.success("Designation deleted");
+            qc.invalidateQueries({queryKey: qk.designationsAll});
+            setDeletingId(null);
+        },
         onError: (err) => {
-            const d = err?.response?.data;
-            toast.error(d?.detail || d?.message || err?.message || "Failed to create designation");
+            toast.error(errText(err, "Failed to delete designation"));
+            setDeletingId(null);
         },
     });
 
@@ -125,8 +158,7 @@ export default function DesignationsPage() {
 
             <DesignationSection
                 departments={departments}
-                // ⬇️ pass ALL sub-departments so names always resolve in the table
-                subDepartments={subDepartmentsAll}
+                subDepartments={subDepartmentsAll}          // pass ALL for name resolution
                 deptOptions={deptOptions}
                 subDeptOptions={subDeptOptions}
                 subDeptsForDesignation={subDeptsForDesignation}
@@ -142,6 +174,12 @@ export default function DesignationsPage() {
                 setDesignationForm={setDesignationForm}
                 onCreate={() => mCreateDesignation.mutate({...designationForm})}
                 onRefresh={() => qc.invalidateQueries({queryKey: qk.designationsAll})}
+
+                // edit/delete wiring:
+                onUpdate={(vars) => mUpdateDesignation.mutate(vars)}
+                updating={mUpdateDesignation.isPending}
+                onDelete={(vars) => mDeleteDesignation.mutate(vars)}
+                deletingId={deletingId}
             />
         </div>
     );

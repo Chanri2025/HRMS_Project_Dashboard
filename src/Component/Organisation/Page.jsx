@@ -11,14 +11,7 @@ import QuickAddPage from "./QuickAddPage.jsx";
 
 import {safeArray, toArray} from "@/Utils/arrays.js";
 import {http, getUserCtx} from "@/lib/http";
-
-function errText(err, fb = "Request failed") {
-    const d = err?.response?.data?.detail;
-    if (Array.isArray(d)) return d.map((x) => x?.msg || JSON.stringify(x)).join("; ");
-    if (typeof d === "string") return d;
-    if (d && typeof d === "object") return JSON.stringify(d);
-    return err?.response?.data?.message || err?.message || fb;
-}
+import {errText} from "@/lib/errText";
 
 const qk = {
     depts: ["org", "departments"],
@@ -30,7 +23,7 @@ const qk = {
 
 const fetcher = async (url, params) => {
     try {
-        const {data} = await http.get(url, {params});
+        const {data} = await http.get(`/${url}`, {params}); // ensure leading slash once
         return Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
     } catch {
         return [];
@@ -39,7 +32,7 @@ const fetcher = async (url, params) => {
 
 export default function Page() {
     const qc = useQueryClient();
-    const {userId} = getUserCtx(); // ← from sessionStorage
+    const {userId} = getUserCtx(); // from sessionStorage
 
     // Filters
     const [deptFilter, setDeptFilter] = useState("");
@@ -49,20 +42,20 @@ export default function Page() {
     const [deptForm, setDeptForm] = useState({
         dept_name: "",
         description: "",
-        created_by: userId || 0,
+        created_by: Number(userId) || 0,
     });
     const [subDeptForm, setSubDeptForm] = useState({
         dept_id: "",
         sub_dept_name: "",
         description: "",
-        created_by: userId || 0,
+        created_by: Number(userId) || 0,
     });
     const [designationForm, setDesignationForm] = useState({
         dept_id: "",
         sub_dept_id: "",
         designation_name: "",
         description: "",
-        created_by: userId || 0,
+        created_by: Number(userId) || 0,
     });
     const [quickForm, setQuickForm] = useState({
         dept_name: "",
@@ -71,7 +64,7 @@ export default function Page() {
         sub_dept_description: "",
         designation_name: "",
         designation_description: "",
-        created_by: userId || 0,
+        created_by: Number(userId) || 0,
     });
 
     /* ------------------------------ queries ------------------------------ */
@@ -81,7 +74,7 @@ export default function Page() {
         select: toArray,
     });
 
-    // Sub-departments for the Sub-Departments tab/list (can be dept-filtered via path param)
+    // Sub-departments for the Sub-Departments tab/list (dept-filtered via path param)
     const {data: subDepartments = [], isLoading: loadingSubDepts} = useQuery({
         queryKey: deptFilter ? qk.subDeptsByDept(Number(deptFilter)) : qk.subDeptsAll,
         queryFn: () =>
@@ -89,7 +82,7 @@ export default function Page() {
         select: toArray,
     });
 
-    // 🚩 Always fetch ALL sub-departments once (single source of truth for names & form dropdowns)
+    // Always fetch ALL sub-departments once (source of truth for names & dropdowns)
     const {data: allSubDepts = [], isLoading: loadingAllSubDepts} = useQuery({
         queryKey: qk.subDeptsAll,
         queryFn: () => fetcher("org/sub-departments"),
@@ -112,7 +105,7 @@ export default function Page() {
         select: toArray,
     });
 
-    // ⬇️ Build the sub-dept list for the Add Designation form from ALL sub-depts (filter by chosen dept)
+    // sub-dept options for Designation form (filter by chosen dept)
     const subDeptsForDesignation = useMemo(() => {
         const list = safeArray(allSubDepts);
         if (!designationForm.dept_id) return list;
@@ -125,7 +118,6 @@ export default function Page() {
         [departments]
     );
 
-    // Right-panel filter sub-dept options (filter by selected dept filter)
     const subDeptOptions = useMemo(() => {
         const base = deptFilter
             ? safeArray(allSubDepts).filter((s) => Number(s.dept_id) === Number(deptFilter))
@@ -136,7 +128,7 @@ export default function Page() {
     /* ----------------------------- mutations ----------------------------- */
     const mCreateDept = useMutation({
         mutationFn: async (payload) =>
-            (await http.post("org/departments", {...payload, created_by: Number(userId) || 0})).data,
+            (await http.post("/org/departments", {...payload, created_by: Number(userId) || 0})).data,
         onSuccess: (data) => {
             toast.success(`Department "${data.dept_name}" created`);
             qc.invalidateQueries({queryKey: qk.depts});
@@ -147,15 +139,18 @@ export default function Page() {
 
     const mCreateSubDept = useMutation({
         mutationFn: async (payload) =>
-            (await http.post("org/sub-departments", {
-                ...payload,
-                dept_id: Number(payload.dept_id),
-                created_by: Number(userId) || 0,
-            })).data,
+            (
+                await http.post("/org/sub-departments", {
+                    ...payload,
+                    dept_id: Number(payload.dept_id),
+                    created_by: Number(userId) || 0,
+                })
+            ).data,
         onSuccess: (data, payload) => {
             toast.success(`Sub-Department "${data.sub_dept_name}" created`);
             qc.invalidateQueries({queryKey: qk.subDeptsAll});
-            if (payload.dept_id) qc.invalidateQueries({queryKey: qk.subDeptsByDept(Number(payload.dept_id))});
+            if (payload.dept_id)
+                qc.invalidateQueries({queryKey: qk.subDeptsByDept(Number(payload.dept_id))});
             setSubDeptForm((s) => ({...s, sub_dept_name: "", description: ""}));
         },
         onError: (err) => toast.error(errText(err, "Failed to create sub-department")),
@@ -163,12 +158,14 @@ export default function Page() {
 
     const mCreateDesignation = useMutation({
         mutationFn: async (payload) =>
-            (await http.post("org/designations", {
-                ...payload,
-                dept_id: Number(payload.dept_id),
-                sub_dept_id: Number(payload.sub_dept_id),
-                created_by: Number(userId) || 0,
-            })).data,
+            (
+                await http.post("/org/designations", {
+                    ...payload,
+                    dept_id: Number(payload.dept_id),
+                    sub_dept_id: Number(payload.sub_dept_id),
+                    created_by: Number(userId) || 0,
+                })
+            ).data,
         onSuccess: (data, payload) => {
             toast.success(`Designation "${data.designation_name}" created`);
             qc.invalidateQueries({queryKey: qk.designationsAll});
@@ -181,10 +178,13 @@ export default function Page() {
     });
 
     const mQuickAdd = useMutation({
-        mutationFn: async (payload) => (await http.post("org/add-all", {
-            ...payload,
-            created_by: Number(userId) || 0
-        })).data,
+        mutationFn: async (payload) =>
+            (
+                await http.post("/org/add-all", {
+                    ...payload,
+                    created_by: Number(userId) || 0,
+                })
+            ).data,
         onSuccess: ({dept, sub_dept, designation}) => {
             toast.success(`Added: ${dept.dept_name} → ${sub_dept.sub_dept_name} → ${designation.designation_name}`);
             qc.invalidateQueries({queryKey: qk.depts});
@@ -251,15 +251,13 @@ export default function Page() {
                 <TabsContent value="designations">
                     <DesignationsPage
                         departments={departments}
-                        // ⬇️ pass ALL sub-departments so names always resolve
-                        subDepartments={allSubDepts}
+                        subDepartments={allSubDepts}            // pass ALL for name resolution
                         deptOptions={deptOptions}
                         subDeptOptions={subDeptOptions}
                         subDeptsForDesignation={subDeptsForDesignation}
                         designations={designations}
                         loadingDepts={loadingDepts}
-                        // use the "all" loading state for the right panel + form dropdown
-                        loadingSubs={loadingAllSubDepts}
+                        loadingSubs={loadingAllSubDepts}        // use "all" loading for right panel
                         loadingDesignations={loadingDesignations}
                         deptFilter={deptFilter}
                         setDeptFilter={setDeptFilter}

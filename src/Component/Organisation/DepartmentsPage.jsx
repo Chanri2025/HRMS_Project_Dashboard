@@ -1,20 +1,12 @@
-// src/pages/DepartmentsPage.jsx
 import React, {useState} from "react";
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
 import DepartmentSection from "./sections/DepartmentSection.jsx";
 import {http, getUserCtx} from "@/lib/http";
 import {toArray} from "@/Utils/arrays";
+import {errText} from "@/lib/errText";
 
 const qk = {depts: ["org", "departments"]};
-
-function errText(err, fb = "Request failed") {
-    const d = err?.response?.data?.detail;
-    if (Array.isArray(d)) return d.map((x) => x?.msg || JSON.stringify(x)).join("; ");
-    if (typeof d === "string") return d;
-    if (d && typeof d === "object") return JSON.stringify(d);
-    return err?.response?.data?.message || err?.message || fb;
-}
 
 // local fetcher
 const fetcher = async (url, params) => {
@@ -29,7 +21,7 @@ const fetcher = async (url, params) => {
 
 export default function DepartmentsPage(props) {
     const {
-        // optional props from Page.jsx
+        // optional props from Page.jsx (we still handle edit/delete here)
         departments: departmentsProp,
         loading: loadingProp,
         deptForm: deptFormProp,
@@ -72,7 +64,42 @@ export default function DepartmentsPage(props) {
         onError: (err) => toast.error(errText(err, "Failed to create department")),
     });
 
-    // Wire up actual sources based on mode
+    // PUT /org/departments/:id
+    const mUpdateDept = useMutation({
+        mutationFn: async ({dept_id, payload}) =>
+            (
+                await http.put(`org/departments/${Number(dept_id)}`, {
+                    dept_name: payload.dept_name,
+                    description: payload.description,
+                    // updated_by: Number(userId) || 0, // add if backend expects
+                })
+            ).data,
+        onSuccess: (data, vars) => {
+            toast.success(`Updated “${data?.dept_name || vars?.payload?.dept_name}”`);
+            qc.invalidateQueries({queryKey: qk.depts});
+        },
+        onError: (err) => toast.error(errText(err, "Failed to update department")),
+    });
+
+    // DELETE /org/departments/:id
+    const [deletingId, setDeletingId] = useState(null);
+    const mDeleteDept = useMutation({
+        mutationFn: async ({dept_id}) => {
+            setDeletingId(Number(dept_id));
+            return (await http.delete(`org/departments/${Number(dept_id)}`)).data;
+        },
+        onSuccess: () => {
+            toast.success("Department deleted");
+            qc.invalidateQueries({queryKey: qk.depts});
+            setDeletingId(null);
+        },
+        onError: (err) => {
+            toast.error(errText(err, "Failed to delete department"));
+            setDeletingId(null);
+        },
+    });
+
+    // Wire up sources based on mode
     const departments = isStandalone ? departmentsLocal : departmentsProp;
     const loading = isStandalone ? loadingLocal : !!loadingProp;
     const deptForm = isStandalone ? deptFormLocal : (deptFormProp ?? {dept_name: "", description: ""});
@@ -97,6 +124,11 @@ export default function DepartmentsPage(props) {
                 setDeptForm={setDeptForm}
                 onCreate={onCreate}
                 onRefresh={onRefresh}
+                // edit/delete
+                onUpdate={(vars) => mUpdateDept.mutate(vars)}
+                updating={mUpdateDept.isPending}
+                onDelete={(vars) => mDeleteDept.mutate(vars)}
+                deletingId={deletingId}
             />
         </div>
     );

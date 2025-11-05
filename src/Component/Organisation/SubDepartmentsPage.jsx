@@ -3,21 +3,22 @@ import React, {useMemo, useState} from "react";
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
 import {safeArray, toArray} from "@/Utils/arrays.js";
-import {http} from "@/lib/http";
+import {http, getUserCtx} from "@/lib/http";
+import {errText} from "@/lib/errText";
 import SubDepartmentSection from "./sections/SubDepartmentSection.jsx";
 
 const qk = {
     depts: ["org", "departments"],
     subDeptsAll: ["org", "sub-departments"],
-    subDeptsByDept: (dept_id) => ["org", "sub-departments", dept_id],
+    subDeptsByDept: (dept_id) => ["org", "sub-departments", Number(dept_id)],
 };
 
 const fetchDepartments = async () => (await http.get("/org/departments")).data;
 
-/* ✅ use /org/sub-departments/:dept_id if filter present */
+/** Use /org/sub-departments/:dept_id when filtering, else /org/sub-departments */
 const fetchSubDepartments = async (deptFilter) => {
     const url = deptFilter
-        ? `/org/sub-departments/${deptFilter}`
+        ? `/org/sub-departments/${Number(deptFilter)}`
         : `/org/sub-departments`;
     const {data} = await http.get(url);
     return data;
@@ -25,12 +26,14 @@ const fetchSubDepartments = async (deptFilter) => {
 
 export default function SubDepartmentsPage() {
     const qc = useQueryClient();
+    const {userId} = getUserCtx?.() || {};
+
     const [deptFilter, setDeptFilter] = useState("");
     const [subDeptForm, setSubDeptForm] = useState({
         dept_id: "",
         sub_dept_name: "",
         description: "",
-        created_by: "system",
+        created_by: Number(userId) || 0, // ← from session_storage
     });
 
     const {data: departments = [], isLoading: loadingDepts} = useQuery({
@@ -46,21 +49,34 @@ export default function SubDepartmentsPage() {
     });
 
     const deptOptions = useMemo(
-        () => safeArray(departments).map((d) => ({value: String(d.dept_id), label: d.dept_name})),
+        () =>
+            safeArray(departments).map((d) => ({
+                value: String(d.dept_id),
+                label: d.dept_name,
+            })),
         [departments]
     );
 
     const mCreateSubDept = useMutation({
-        mutationFn: async (payload) => (await http.post("/org/sub-departments", payload)).data,
+        mutationFn: async (payload) => {
+            const body = {
+                ...payload,
+                dept_id: Number(payload.dept_id),
+                created_by: Number(userId) || 0,
+            };
+            return (await http.post("/org/sub-departments", body)).data;
+        },
         onSuccess: (data, payload) => {
             toast.success(`Sub-Department “${data.sub_dept_name}” created`);
             qc.invalidateQueries({queryKey: qk.subDeptsAll});
-            if (payload.dept_id)
-                qc.invalidateQueries({queryKey: qk.subDeptsByDept(payload.dept_id)});
+            if (payload.dept_id) {
+                qc.invalidateQueries({
+                    queryKey: qk.subDeptsByDept(payload.dept_id),
+                });
+            }
             setSubDeptForm((s) => ({...s, sub_dept_name: "", description: ""}));
         },
-        onError: (err) =>
-            toast.error(err?.response?.data?.detail || "Failed to create sub-department"),
+        onError: (err) => toast.error(errText(err, "Failed to create sub-department")),
     });
 
     return (
