@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { SprintHeader } from "@/components/SprintHeader";
-import { KanbanColumn } from "@/components/KanbanColumn";
-import { TaskCard } from "@/components/TaskCard";
-import { GanttView } from "@/components/GanttView";
-import { TableView } from "@/components/TableView";
+import { SprintHeader } from "@/Utils/SprintHeader.jsx";
+import { KanbanColumn } from "@/Utils/KanbanColumn.jsx";
+import { TaskCard } from "@/Utils/TaskCard.jsx";
+import { GanttView } from "@/Utils/GanttView.jsx";
+import { TableView } from "@/Utils/TableView.jsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DndContext,

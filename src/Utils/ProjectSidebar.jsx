@@ -48,7 +48,7 @@ const menuItems = [
         url: "/team",
         icon: Users,
         children: [
-            {title: "Home", url: "/team"},
+            {title: "Dashboard", url: "/team"},
             {title: "Organisation Tree", url: "/team/org"},
             {title: "Departments", url: "/team/departments"},
             {title: "Sub - Departments", url: "/team/org/sub-departments"},

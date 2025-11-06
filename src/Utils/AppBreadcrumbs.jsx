@@ -33,7 +33,7 @@ export default function AppBreadcrumbs() {
   const crumbs = useMemo(() => {
     const segments = pathname.split("/").filter(Boolean);
     if (segments.length === 0)
-      return [{ path: "/", label: LABELS["/"] || "Home" }];
+      return [{ path: "/", label: LABELS["/"] || "Dashboard" }];
 
     const acc = [];
     let built = "";
@@ -41,7 +41,7 @@ export default function AppBreadcrumbs() {
       built += `/${seg}`;
       acc.push({ path: built, label: LABELS[built] || decodeURIComponent(seg) });
     });
-    return [{ path: "/", label: LABELS["/"] || "Home" }, ...acc];
+    return [{ path: "/", label: LABELS["/"] || "Dashboard" }, ...acc];
   }, [pathname]);
 
   const last = crumbs[crumbs.length - 1]?.path;

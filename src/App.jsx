@@ -7,11 +7,11 @@ import {SidebarProvider, SidebarTrigger} from "@/components/ui/sidebar";
 import {ProjectSidebar} from "@/Utils/ProjectSidebar.jsx";
 import HeaderBar from "@/Utils/HeaderBar.jsx";
 
-import Index from "@/pages/Index";
-import Board from "@/pages/Board";
-import Calendar from "@/pages/Calendar";
-import Attendance from "@/pages/Attendance";
-import NotFound from "@/pages/NotFound";
+import Page from "@/Component/Dashboard/Page.jsx";
+import Board from "@/Component/Board.jsx";
+import Calendar from "@/Component/Calendar.jsx";
+import Attendance from "@/Component/Attendance.jsx";
+import NotFound from "@/Utils/NotFound.jsx";
 import LandingPage from "@/Component/auth/LandingPage";
 import Org from "@/Component/Organisation/Page";
 import DepartmentsPage from "@/Component/Organisation/DepartmentsPage";
@@ -118,7 +118,7 @@ function App() {
 
                         {/* Routes */}
                         <Routes>
-                            <Route path="/" element={<Index/>}/>
+                            <Route path="/" element={<Page/>}/>
                             <Route path="/board" element={<Board/>}/>
                             <Route path="/calendar" element={<Calendar/>}/>
                             <Route path="/attendance" element={<Attendance/>}/>
