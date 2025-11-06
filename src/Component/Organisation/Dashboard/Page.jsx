@@ -4,12 +4,12 @@ import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 
-import DepartmentsPage from "./DepartmentsPage.jsx";
-import DesignationsPage from "./DesignationsPage.jsx";
-import SubDepartmentsPage from "./SubDepartmentsPage.jsx";
-import QuickAddPage from "./QuickAddPage.jsx";
+import DepartmentsPage from "../Departments/DepartmentsPage.jsx";
+import DesignationsPage from "../Designations/DesignationsPage.jsx";
+import SubDepartmentsPage from "../SubDepartments/SubDepartmentsPage.jsx";
+import QuickAddPage from "../QuickAdd/QuickAddPage.jsx";
 
-import {safeArray, toArray} from "@/Utils/arrays.js";
+import {safeArray, toArray} from "@/Utils/arrays";
 import {http, getUserCtx} from "@/lib/http";
 import {errText} from "@/lib/errText";
 

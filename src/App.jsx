@@ -13,11 +13,16 @@ import Calendar from "@/Component/Calendar.jsx";
 import Attendance from "@/Component/Attendance.jsx";
 import NotFound from "@/Utils/NotFound.jsx";
 import LandingPage from "@/Component/auth/LandingPage";
-import Org from "@/Component/Organisation/Page";
-import DepartmentsPage from "@/Component/Organisation/DepartmentsPage";
-import SubDepartmentsPage from "@/Component/Organisation/SubDepartmentsPage.jsx";
-import DesignationsPage from "@/Component/Organisation/DesignationsPage.jsx";
-import QuickAddPage from "@/Component/Organisation/QuickAddPage.jsx";
+
+import Org from "@/Component/Organisation/Dashboard/Page.jsx";
+import DepartmentsPage from "@/Component/Organisation/Departments/DepartmentsPage.jsx";
+import SubDepartmentsPage from "@/Component/Organisation/SubDepartments/SubDepartmentsPage.jsx";
+import DesignationsPage from "@/Component/Organisation/Designations/DesignationsPage.jsx";
+import QuickAddPage from "@/Component/Organisation/QuickAdd/QuickAddPage.jsx";
+
+
+import EmployeeDashboard from "@/Component/Employee Section/Dashboard/Page.jsx";
+import AddUserForm from "@/Component/Employee Section/Employee/AddUserForm.jsx";
 
 import AppBreadcrumbs from "@/Utils/AppBreadcrumbs.jsx";
 import {useEffect, useMemo, useState} from "react";
@@ -124,10 +129,13 @@ function App() {
                             <Route path="/attendance" element={<Attendance/>}/>
 
                             <Route path="/team" element={<Org/>}/>
-                            <Route path="/team/departments" element={<DepartmentsPage/>} />
+                            <Route path="/team/departments" element={<DepartmentsPage/>}/>
                             <Route path="/team/org/sub-departments" element={<SubDepartmentsPage/>}/>
                             <Route path="/team/org/designations" element={<DesignationsPage/>}/>
                             <Route path="/team/org/quick-add" element={<QuickAddPage/>}/>
+
+                            <Route path="/employees-section/dashboard" element={<EmployeeDashboard/>}/>
+                            <Route path="/employees-section/add" element={<AddUserForm/>}/>
 
                             <Route path="*" element={<NotFound/>}/>
                         </Routes>

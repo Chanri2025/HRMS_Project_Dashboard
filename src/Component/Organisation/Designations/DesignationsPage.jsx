@@ -2,9 +2,9 @@ import React, {useMemo, useState} from "react";
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
 import {safeArray, toArray} from "@/Utils/arrays.js";
-import {http, getUserCtx} from "@/lib/http";
-import {errText} from "@/lib/errText";
-import DesignationSection from "./sections/DesignationSection.jsx";
+import {http, getUserCtx} from "@/lib/http.js";
+import {errText} from "@/lib/errText.js";
+import DesignationSection from "./DesignationSection.jsx";
 
 /* ----------------------------- helpers ----------------------------- */
 const qk = {

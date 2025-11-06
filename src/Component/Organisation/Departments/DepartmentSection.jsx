@@ -16,7 +16,7 @@ import {
     DialogFooter,
     DialogClose,
 } from "@/components/ui/dialog";
-import {safeArray} from "@/Utils/arrays.js";
+import {safeArray} from "@/Utils/arrays";
 
 export default function DepartmentSection({
                                               departments,

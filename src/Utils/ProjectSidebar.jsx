@@ -1,15 +1,7 @@
 // src/components/ProjectSidebar.jsx
 import React, {useMemo} from "react";
 import {NavLink, useLocation} from "react-router-dom";
-import {
-    LayoutDashboard,
-    KanbanSquare,
-    Users,
-    Settings,
-    Calendar,
-    BarChart3,
-    ChevronRight,
-} from "lucide-react";
+import {ChevronRight} from "lucide-react";
 import {
     Sidebar,
     SidebarContent,
@@ -26,55 +18,16 @@ import {
     CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 
-/** 👉 You can freely edit this structure. Nested `children` renders a collapsible submenu. */
-const menuItems = [
-    {title: "Dashboard", url: "/", icon: LayoutDashboard},
-    {title: "Board", url: "/board", icon: KanbanSquare},
-    {title: "Calendar", url: "/calendar", icon: Calendar},
-    {title: "Attendance", url: "/attendance", icon: Users},
-
-    {
-        title: "Reports",
-        url: "/reports",
-        icon: BarChart3,
-        children: [
-            {title: "Overview", url: "/reports/overview"},
-            {title: "Sales", url: "/reports/sales"},
-            {title: "Team Performance", url: "/reports/team-performance"},
-        ],
-    },
-    {
-        title: "Organisations",
-        url: "/team",
-        icon: Users,
-        children: [
-            {title: "Dashboard", url: "/team"},
-            {title: "Organisation Tree", url: "/team/org"},
-            {title: "Departments", url: "/team/departments"},
-            {title: "Sub - Departments", url: "/team/org/sub-departments"},
-            {title: "Designations", url: "/team/org/designations"},
-            {title: "Quick Add", url: "/team/org/quick-add"},
-        ],
-    },
-    {title: "Settings", url: "/settings", icon: Settings},
-];
-
-function ParentIsActive(pathname, parentUrl, children = []) {
-    if (pathname === parentUrl) return true;
-    if (pathname.startsWith(parentUrl + "/")) return true;
-    return children.some(
-        (c) => pathname === c.url || pathname.startsWith(c.url + "/")
-    );
-}
+import {MENU, parentIsActive} from "@/Utils/navigation";
 
 export function ProjectSidebar() {
     const {pathname} = useLocation();
 
     const items = useMemo(
         () =>
-            menuItems.map((item) => ({
+            MENU.map((item) => ({
                 ...item,
-                isActive: ParentIsActive(pathname, item.url, item.children),
+                isActive: parentIsActive(pathname, item.url, item.children),
             })),
         [pathname]
     );
@@ -94,7 +47,6 @@ export function ProjectSidebar() {
                             {items.map((item) => {
                                 const Icon = item.icon;
 
-                                // -------- Simple link (no children)
                                 if (!item.children?.length) {
                                     return (
                                         <SidebarMenuItem key={item.title}>
@@ -112,7 +64,7 @@ export function ProjectSidebar() {
                                                         ].join(" ")
                                                     }
                                                 >
-                                                    <Icon className="h-4 w-4"/>
+                                                    {Icon ? <Icon className="h-4 w-4"/> : null}
                                                     <span>{item.title}</span>
                                                 </NavLink>
                                             </SidebarMenuButton>
@@ -120,10 +72,8 @@ export function ProjectSidebar() {
                                     );
                                 }
 
-                                // -------- Collapsible group (has children)
                                 return (
                                     <SidebarMenuItem key={item.title}>
-                                        {/* Use a group to style child elements based on open/closed state */}
                                         <Collapsible defaultOpen={item.isActive} className="group/coll">
                                             <CollapsibleTrigger asChild>
                                                 <SidebarMenuButton
@@ -137,11 +87,9 @@ export function ProjectSidebar() {
                                                     ].join(" ")}
                                                 >
                           <span className="flex items-center gap-2">
-                            <Icon className="h-4 w-4"/>
+                            {Icon ? <Icon className="h-4 w-4"/> : null}
                               {item.title}
                           </span>
-
-                                                    {/* Arrow with smooth rotation + subtle scale on press */}
                                                     <ChevronRight
                                                         className={[
                                                             "h-4 w-4 transition-transform duration-200 ease-out",
@@ -152,10 +100,6 @@ export function ProjectSidebar() {
                                                 </SidebarMenuButton>
                                             </CollapsibleTrigger>
 
-                                            {/* Animated content:
-                          - fade & slide
-                          - smooth height using transition-all
-                      */}
                                             <CollapsibleContent
                                                 className={[
                                                     "overflow-hidden pl-8",

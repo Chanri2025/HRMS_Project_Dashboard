@@ -2,7 +2,7 @@ import React, {useState} from "react";
 import axios from "axios";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
-import QuickAddSection from "./sections/QuickAddSection.jsx";
+import QuickAddSection from "./QuickAddSection.jsx";
 
 const qk = {
     depts: ["org", "departments"],
