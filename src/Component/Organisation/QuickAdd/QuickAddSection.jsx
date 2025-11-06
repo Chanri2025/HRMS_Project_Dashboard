@@ -4,7 +4,7 @@ import {Label} from "@/components/ui/label";
 import {Input} from "@/components/ui/input";
 import {Separator} from "@/components/ui/separator";
 import {Button} from "@/components/ui/button";
-import LoadingDot from "../LoadingDot.jsx";
+import LoadingDot from "@/Component/Organisation/LoadingDot.jsx";
 
 export default function QuickAddSection({quickForm, setQuickForm, onSubmit, pending}) {
     return (

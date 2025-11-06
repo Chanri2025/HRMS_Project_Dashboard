@@ -1,7 +1,7 @@
 import React, {useState} from "react";
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
-import DepartmentSection from "./DepartmentSection.jsx";
+import DepartmentSection from "@/Component/Organisation/Departments/DepartmentSection.jsx";
 import {http, getUserCtx} from "@/lib/http.js";
 import {toArray} from "@/Utils/arrays.js";
 import {errText} from "@/lib/errText.js";

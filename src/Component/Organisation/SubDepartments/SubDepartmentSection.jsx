@@ -33,7 +33,7 @@ import {
     DialogClose,
 } from "@/components/ui/dialog";
 import {safeArray} from "@/Utils/arrays.js";
-import DeptFilter from "../filters/DeptFilter.jsx";
+import DeptFilter from "@/Component/Organisation/Filters/DeptFilter.jsx";
 import {http, getUserCtx} from "@/lib/http";
 import {errText} from "@/lib/errText";
 

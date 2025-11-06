@@ -29,8 +29,8 @@ import {
     DialogFooter,
     DialogClose
 } from "@/components/ui/dialog";
-import DeptFilter from "../filters/DeptFilter.jsx";
-import SubDeptFilter from "../filters/SubDeptFilter.jsx";
+import DeptFilter from "@/Component/Organisation/Filters/DeptFilter.jsx";
+import SubDeptFilter from "@/Component/Organisation/Filters/SubDeptFilter.jsx";
 import {safeArray} from "@/Utils/arrays.js";
 
 export default function DesignationSection({

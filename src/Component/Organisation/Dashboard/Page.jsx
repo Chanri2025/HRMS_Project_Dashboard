@@ -4,10 +4,10 @@ import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 
-import DepartmentsPage from "../Departments/DepartmentsPage.jsx";
-import DesignationsPage from "../Designations/DesignationsPage.jsx";
-import SubDepartmentsPage from "../SubDepartments/SubDepartmentsPage.jsx";
-import QuickAddPage from "../QuickAdd/QuickAddPage.jsx";
+import DepartmentsPage from "@/Component/Organisation/Departments/DepartmentsPage.jsx";
+import DesignationsPage from "@/Component/Organisation/Designations/DesignationsPage.jsx";
+import SubDepartmentsPage from "@/Component/Organisation/SubDepartments/SubDepartmentsPage.jsx";
+import QuickAddPage from "@/Component/Organisation/QuickAdd/QuickAddPage.jsx";
 
 import {safeArray, toArray} from "@/Utils/arrays";
 import {http, getUserCtx} from "@/lib/http";

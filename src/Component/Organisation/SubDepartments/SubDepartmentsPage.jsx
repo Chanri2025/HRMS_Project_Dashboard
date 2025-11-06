@@ -5,7 +5,7 @@ import {toast} from "sonner";
 import {safeArray, toArray} from "@/Utils/arrays.js";
 import {http, getUserCtx} from "@/lib/http.js";
 import {errText} from "@/lib/errText.js";
-import SubDepartmentSection from "./SubDepartmentSection.jsx";
+import SubDepartmentSection from "@/Component/Organisation/SubDepartments/SubDepartmentSection.jsx";
 
 const qk = {
     depts: ["org", "departments"],
