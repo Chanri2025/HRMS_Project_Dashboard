@@ -1,3 +1,4 @@
+// src/pages/Page.jsx (Dashboard)
 import React, {useMemo} from "react";
 import {useNavigate} from "react-router-dom";
 import {Activity, TrendingUp, Users, Target} from "lucide-react";
@@ -7,13 +8,14 @@ import {MetricStatCard} from "./MetricStatCard";
 import {CurrentSprintCard} from "./CurrentSprintCard";
 import {TeamMembersCard} from "./TeamMembersCard";
 
-// ⬇️ import the hook so we can hoist members and reuse it
 import {useDeptMembers} from "@/hooks/useDeptMembers";
+import {useActiveProjects} from "@/hooks/useActiveProjects";
+import {useSubProjects} from "@/hooks/useSubProjects";
+import {MetricStatCardSkeleton} from "@/Component/Dashboard/SkeletonLoading/MetricStatCardSkeleton";
 
 const Page = () => {
     const navigate = useNavigate();
 
-    // Auto-detect deptId + fetch members once here
     const {
         data: deptMembers,
         isLoading: membersLoading,
@@ -27,19 +29,47 @@ const Page = () => {
         [deptMembers]
     );
 
+    const {
+        activeCount,
+        isLoading: projectsLoading,
+        isError: projectsError,
+        error: projectsErrorObj,
+    } = useActiveProjects();
+
+    const {
+        total: totalSubProjects,
+        completedCount,
+        completionPercent,
+        isLoading: subsLoading,
+        isError: subsError,
+        error: subsErrorObj,
+    } = useSubProjects();
+
     const metrics = useMemo(
         () => [
             {
-                id: "activeTasks",
+                id: "activeProjects",
+                loading: projectsLoading,
                 icon: <Activity className="h-5 w-5 text-primary"/>,
                 iconWrapClass: "bg-primary/10",
-                badgeText: "+12%",
-                badgeClass: "bg-success/10 text-success border-success/20",
-                value: "24",
-                label: "Active Tasks",
+                badgeText: projectsLoading
+                    ? "Loading"
+                    : projectsError
+                        ? "Error"
+                        : "Live",
+                badgeClass: projectsError
+                    ? "bg-destructive/10 text-destructive border-destructive/20"
+                    : "bg-primary/5 text-primary border-primary/20",
+                value: projectsLoading
+                    ? "—"
+                    : projectsError
+                        ? "0"
+                        : String(activeCount),
+                label: "Active Projects",
             },
             {
                 id: "storyPoints",
+                loading: false,
                 icon: <TrendingUp className="h-5 w-5 text-success"/>,
                 iconWrapClass: "bg-success/10",
                 badgeText: "+8%",
@@ -49,49 +79,84 @@ const Page = () => {
             },
             {
                 id: "members",
+                loading: membersLoading,
                 icon: <Users className="h-5 w-5 text-info"/>,
                 iconWrapClass: "bg-info/10",
-                badgeText: membersLoading ? "…" : membersError ? "Error" : "Active",
-                badgeClass: `bg-info/10 text-info border-info/20`,
-                value: membersLoading ? "—" : membersError ? "0" : String(memberCount),
+                badgeText: membersLoading
+                    ? "Loading"
+                    : membersError
+                        ? "Error"
+                        : "Active",
+                badgeClass: "bg-info/10 text-info border-info/20",
+                value: membersLoading
+                    ? "—"
+                    : membersError
+                        ? "0"
+                        : String(memberCount),
                 label: "Team Members",
             },
             {
-                id: "completed",
+                id: "completedSubProjects",
+                loading: subsLoading,
                 icon: <Target className="h-5 w-5 text-warning"/>,
                 iconWrapClass: "bg-warning/10",
-                badgeText: "50%",
-                badgeClass: "bg-warning/10 text-warning border-warning/20",
-                value: "12/24",
-                label: "Completed",
+                badgeText: subsLoading
+                    ? "Loading"
+                    : subsError
+                        ? "Error"
+                        : `${completionPercent}%`,
+                badgeClass: subsError
+                    ? "bg-destructive/10 text-destructive border-destructive/20"
+                    : "bg-warning/10 text-warning border-warning/20",
+                value: subsLoading
+                    ? "—"
+                    : subsError
+                        ? "0"
+                        : `${completedCount}/${totalSubProjects || 0}`,
+                label: "Completed Sub-Projects",
             },
         ],
-        [memberCount, membersLoading, membersError]
+        [
+            activeCount,
+            projectsLoading,
+            projectsError,
+            memberCount,
+            membersLoading,
+            membersError,
+            subsLoading,
+            subsError,
+            completionPercent,
+            completedCount,
+            totalSubProjects,
+        ]
     );
 
     return (
         <div className="min-h-screen p-6 space-y-6">
-            {/* Header */}
             <DashboardHeader
                 title="Dashboard"
                 subtitle="Welcome back! Here's your sprint overview"
-                ctaLabel="View Board"
+                ctaLabel="View Page"
                 onCta={() => navigate("/board")}
             />
 
-            {/* Metrics */}
+            {/* Metrics with per-card skeletons */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {metrics.map((m) => (
-                    <MetricStatCard
-                        key={m.id}
-                        icon={m.icon}
-                        iconWrapClass={m.iconWrapClass}
-                        badgeText={m.badgeText}
-                        badgeClass={m.badgeClass}
-                        value={m.value}
-                        label={m.label}
-                    />
-                ))}
+                {metrics.map((m) =>
+                    m.loading ? (
+                        <MetricStatCardSkeleton key={m.id}/>
+                    ) : (
+                        <MetricStatCard
+                            key={m.id}
+                            icon={m.icon}
+                            iconWrapClass={m.iconWrapClass}
+                            badgeText={m.badgeText}
+                            badgeClass={m.badgeClass}
+                            value={m.value}
+                            label={m.label}
+                        />
+                    )
+                )}
             </div>
 
             {/* Sprint + Team */}
@@ -106,7 +171,6 @@ const Page = () => {
                     onOpenBoard={() => navigate("/board")}
                 />
 
-                {/* Reuse fetched members; prevent TeamMembersCard from fetching again */}
                 <TeamMembersCard
                     members={deptMembers ?? []}
                     deptId={detectedDeptId}
@@ -114,10 +178,31 @@ const Page = () => {
                 />
             </div>
 
-            {/* Optional: show fetch error inline (non-intrusive) */}
+            {/* Non-intrusive errors */}
             {membersError && (
                 <p className="text-xs text-destructive/80">
-                    Failed to load team members{membersErrorObj?.message ? `: ${membersErrorObj.message}` : ""}.
+                    Failed to load team members
+                    {membersErrorObj?.message
+                        ? `: ${membersErrorObj.message}`
+                        : ""}.
+                </p>
+            )}
+
+            {projectsError && (
+                <p className="text-xs text-destructive/80">
+                    Failed to load projects
+                    {projectsErrorObj?.message
+                        ? `: ${projectsErrorObj.message}`
+                        : ""}.
+                </p>
+            )}
+
+            {subsError && (
+                <p className="text-xs text-destructive/80">
+                    Failed to load sub-projects
+                    {subsErrorObj?.message
+                        ? `: ${subsErrorObj.message}`
+                        : ""}.
                 </p>
             )}
         </div>

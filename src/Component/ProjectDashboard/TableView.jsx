@@ -6,10 +6,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Card } from "@/components/ui/card";
+} from "@/components/ui/table.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar.tsx";
+import { Card } from "@/components/ui/card.tsx";
 
 const priorityColors = {
   low: "bg-info/10 text-info border-info/20",

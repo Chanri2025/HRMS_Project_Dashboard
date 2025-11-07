@@ -6,16 +6,25 @@ import {
     Settings,
     Calendar,
     BarChart3,
-    UserCog
+    UserCog,
+    Target
 } from "lucide-react";
 
 /** Single source of truth for app navigation */
 export const MENU = [
     {title: "Dashboard", url: "/", icon: LayoutDashboard},
-    {title: "Board", url: "/board", icon: KanbanSquare},
+    {title: "Project Page", url: "/board", icon: KanbanSquare},
     {title: "Calendar", url: "/calendar", icon: Calendar},
     {title: "Attendance", url: "/attendance", icon: Users},
-
+    {
+        title: "Project Section",
+        url: "/project",
+        icon: Target,
+        children: [
+            {title: "Project Dashboard", url: "/project"},
+            {title: "Create Project", url: "/project/add"},
+        ],
+    },
     {
         title: "Reports",
         url: "/reports",

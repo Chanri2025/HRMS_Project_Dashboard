@@ -8,7 +8,7 @@ import {ProjectSidebar} from "@/Utils/ProjectSidebar.jsx";
 import HeaderBar from "@/Utils/HeaderBar.jsx";
 
 import Page from "@/Component/Dashboard/Page.jsx";
-import Board from "@/Component/Board.jsx";
+import ProjectDashboardPage from "@/Component/ProjectDashboard/Page.jsx";
 import Calendar from "@/Component/Calendar.jsx";
 import Attendance from "@/Component/Attendance.jsx";
 import NotFound from "@/Utils/NotFound.jsx";
@@ -124,9 +124,11 @@ function App() {
                         {/* Routes */}
                         <Routes>
                             <Route path="/" element={<Page/>}/>
-                            <Route path="/board" element={<Board/>}/>
+                            <Route path="/board" element={<ProjectDashboardPage/>}/>
                             <Route path="/calendar" element={<Calendar/>}/>
                             <Route path="/attendance" element={<Attendance/>}/>
+
+                            <Route path="/project" element={<ProjectDashboardPage/>}/>
 
                             <Route path="/team" element={<Org/>}/>
                             <Route path="/team/departments" element={<DepartmentsPage/>}/>
