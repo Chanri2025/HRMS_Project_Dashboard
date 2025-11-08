@@ -7,11 +7,20 @@ import {useSortable} from "@dnd-kit/sortable";
 import {CSS} from "@dnd-kit/utilities";
 import {useUserById} from "@/hooks/useActiveProjects";
 
-const priorityColors = {
-    low: "bg-info/10 text-info border-info/20",
-    medium: "bg-warning/10 text-warning border-warning/20",
-    high: "bg-destructive/10 text-destructive border-destructive/20",
-    urgent: "bg-destructive text-destructive-foreground",
+// Badge colors per priority
+const badgePriorityColors = {
+    low: "bg-muted/60 text-muted-foreground border-transparent",
+    medium: "bg-warning/10 text-warning border-warning/40",
+    important: "bg-info/10 text-info border-info/40",
+    urgent: "bg-destructive text-destructive-foreground border-destructive",
+};
+
+// Card bg/border per priority (makes cards colorful)
+const cardPriorityColors = {
+    low: "bg-muted/30 border-transparent",
+    medium: "bg-warning/5 border-warning/40",
+    important: "bg-info/5 border-info/40",
+    urgent: "bg-destructive/5 border-destructive/40",
 };
 
 function getInitials(name = "") {
@@ -30,7 +39,7 @@ export function TaskCard({
                              title,
                              description,
                              priority,
-                             assigneeId,      // 🔹 comes from mapped subprojects
+                             assigneeId,
                              storyPoints,
                              comments,
                              endDate,
@@ -50,7 +59,16 @@ export function TaskCard({
         opacity: isDragging ? 0.5 : 1,
     };
 
-    // Fetch assignee details (safe if assigneeId is undefined)
+    // Safe priority fallback
+    const safePriority =
+        priority === "urgent" ||
+        priority === "medium" ||
+        priority === "important" ||
+        priority === "low"
+            ? priority
+            : "low";
+
+    // Fetch assignee details (if exists)
     const {data: user} = useUserById(assigneeId);
 
     const fullName =
@@ -74,22 +92,28 @@ export function TaskCard({
             style={style}
             {...attributes}
             {...listeners}
-            className="p-4 hover:shadow-md transition-shadow cursor-move group"
+            className={`p-4 border rounded-xl hover:shadow-md transition-all cursor-move group ${cardPriorityColors[safePriority]}`}
         >
             <div className="space-y-3">
+                {/* Title + Priority */}
                 <div className="flex items-start justify-between gap-2">
                     <h3 className="font-medium text-sm group-hover:text-primary transition-colors">
                         {title}
                     </h3>
-                    <Badge variant="outline" className={priorityColors[priority]}>
-                        {priority}
+                    <Badge
+                        variant="outline"
+                        className={`px-2 py-0.5 text-[10px] font-semibold capitalize ${badgePriorityColors[safePriority]}`}
+                    >
+                        {safePriority}
                     </Badge>
                 </div>
 
+                {/* Description */}
                 <p className="text-sm text-muted-foreground line-clamp-2">
                     {description}
                 </p>
 
+                {/* Meta: points, comments, due, assignee */}
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex flex-col gap-1 text-xs text-muted-foreground">
                         <div className="flex items-center gap-3">

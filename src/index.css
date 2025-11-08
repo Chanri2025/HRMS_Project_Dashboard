@@ -6,6 +6,15 @@
 All colors MUST be HSL.
 */
 
+/* Hide scrollbars while keeping scroll functional */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+
+.scrollbar-hide {
+    scrollbar-width: none;
+}
+
 @layer base {
   :root {
     --background: 210 20% 98%;

@@ -1,15 +1,18 @@
 import React, {useState, useMemo, useEffect} from "react";
+
 import {ProjectHeader} from "@/Component/ProjectDashboard/ProjectHeader/ProjectHeader.jsx";
 import {KanbanColumn} from "@/Component/ProjectDashboard/KanbanColumn.jsx";
 import {TaskCard} from "@/Component/ProjectDashboard/TaskCard.jsx";
 import {GanttView} from "@/Component/ProjectDashboard/GanttView.jsx";
 import {TableView} from "@/Component/ProjectDashboard/TableView.jsx";
+
 import {
     Tabs,
     TabsContent,
     TabsList,
     TabsTrigger,
 } from "@/components/ui/tabs.tsx";
+
 import {
     DndContext,
     DragOverlay,
@@ -17,6 +20,7 @@ import {
     useSensor,
     useSensors,
 } from "@dnd-kit/core";
+
 import {
     SortableContext,
     verticalListSortingStrategy,
@@ -25,9 +29,12 @@ import {
 import {
     useActiveProjects,
     useProjectById,
-} from "@/hooks/useActiveProjects";
+    useProjectMembers,
+} from "@/hooks/useActiveProjects.js";
 
-// Map API subprojects -> board tasks
+import {SubProjectCreateDialog} from "@/Component/ProjectDashboard/ProjectHeader/SubProjectCreateDialog.jsx";
+
+// ---------- Map API subprojects -> board tasks (statuses aligned with dropdown) ----------
 function mapSubprojectsToTasks(subprojects = []) {
     return subprojects.map((sp) => {
         const rawStatus = (
@@ -38,7 +45,7 @@ function mapSubprojectsToTasks(subprojects = []) {
             .toLowerCase()
             .trim();
 
-        // Default To Do
+        // Kanban column key (only these four)
         let status = "todo";
 
         if (rawStatus === "to do" || rawStatus === "todo") {
@@ -81,7 +88,7 @@ function mapSubprojectsToTasks(subprojects = []) {
             title,
             description: sp.description || "",
             priority: "medium",
-            status,
+            status, // one of: backlog | todo | in-progress | done
             assigneeId,
             startDate: start,
             endDate: end,
@@ -94,8 +101,10 @@ function mapSubprojectsToTasks(subprojects = []) {
 export default function Page() {
     const [tasks, setTasks] = useState([]);
     const [activeId, setActiveId] = useState(null);
+    const [selectedProjectId, setSelectedProjectId] = useState(null);
+    const [createOpen, setCreateOpen] = useState(false);
 
-    // Load active projects
+    // ---------- Load active projects ----------
     const {
         activeProjects,
         activeCount,
@@ -103,16 +112,14 @@ export default function Page() {
         isError: projectsError,
     } = useActiveProjects();
 
-    // Selected project
-    const [selectedProjectId, setSelectedProjectId] = useState(null);
-
+    // Default select first active project
     useEffect(() => {
         if (!projectsLoading && !projectsError && activeProjects?.length > 0) {
             setSelectedProjectId((prev) => prev ?? activeProjects[0].id);
         }
     }, [projectsLoading, projectsError, activeProjects]);
 
-    // Detailed project with subprojects
+    // ---------- Detailed project ----------
     const {
         data: detailedProject,
         isLoading: projectDetailLoading,
@@ -126,7 +133,18 @@ export default function Page() {
 
     const selectedProject = detailedProject || baseSelectedProject || null;
 
-    // Whenever selectedProject.subprojects changes, rebuild tasks
+    // ---------- Project members for dialog dropdowns ----------
+    const {data: membersData} = useProjectMembers(selectedProject?.id, {
+        enabled: !!selectedProject?.id,
+    });
+
+    const projectMembers =
+        membersData?.members ||
+        membersData ||
+        selectedProject?.members ||
+        [];
+
+    // ---------- Build tasks whenever subprojects change ----------
     useEffect(() => {
         if (selectedProject?.subprojects) {
             setTasks(mapSubprojectsToTasks(selectedProject.subprojects));
@@ -135,6 +153,7 @@ export default function Page() {
         }
     }, [selectedProject?.subprojects]);
 
+    // ---------- DnD ----------
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {distance: 8},
@@ -173,6 +192,7 @@ export default function Page() {
                         : task
                 )
             );
+            // here you can also call your update-subproject-status API if needed
         }
 
         setActiveId(null);
@@ -193,6 +213,16 @@ export default function Page() {
                 selectedProject={selectedProject}
                 onSelectProject={setSelectedProjectId}
                 tasks={tasks}
+                // hook the "Create Sub Project" button in header to this:
+                onCreateSubProject={() => setCreateOpen(true)}
+            />
+
+            {/* Create Sub Project Modal */}
+            <SubProjectCreateDialog
+                open={createOpen}
+                onOpenChange={setCreateOpen}
+                projectId={selectedProject?.id}
+                projectMembers={projectMembers}
             />
 
             <Tabs defaultValue="kanban" className="flex-1 flex flex-col">
@@ -212,6 +242,7 @@ export default function Page() {
                         onDragEnd={handleDragEnd}
                     >
                         <div className="flex gap-6 p-6 h-full">
+                            {/* Backlog */}
                             <SortableContext
                                 items={tasksByStatus.backlog.map((t) => t.id)}
                                 strategy={verticalListSortingStrategy}
@@ -228,6 +259,7 @@ export default function Page() {
                                 </KanbanColumn>
                             </SortableContext>
 
+                            {/* To Do */}
                             <SortableContext
                                 items={tasksByStatus.todo.map((t) => t.id)}
                                 strategy={verticalListSortingStrategy}
@@ -244,6 +276,7 @@ export default function Page() {
                                 </KanbanColumn>
                             </SortableContext>
 
+                            {/* In Progress */}
                             <SortableContext
                                 items={tasksByStatus.inProgress.map((t) => t.id)}
                                 strategy={verticalListSortingStrategy}
@@ -260,6 +293,7 @@ export default function Page() {
                                 </KanbanColumn>
                             </SortableContext>
 
+                            {/* Done */}
                             <SortableContext
                                 items={tasksByStatus.done.map((t) => t.id)}
                                 strategy={verticalListSortingStrategy}
