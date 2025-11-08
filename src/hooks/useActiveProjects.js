@@ -1,3 +1,4 @@
+// src/hooks/useActiveProjects.js
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
 import {http, getUserCtx} from "@/lib/http";
@@ -12,6 +13,7 @@ function normalizeProject(row = {}) {
         createdOn: row.created_on || row.createdAt || null,
         lastModified: row.last_modified || row.updatedAt || null,
         createdById: row.created_by ?? row.createdBy ?? null,
+        subprojects: Array.isArray(row.subprojects) ? row.subprojects : [],
     };
 }
 
@@ -50,6 +52,33 @@ export function useActiveProjects() {
     };
 }
 
+// Single project (with subprojects) from /projects/{id}
+export function useProjectById(projectId) {
+    const ctx = getUserCtx();
+    const accessToken = ctx?.accessToken || "";
+    const enabled = Boolean(accessToken) && Boolean(projectId);
+
+    return useQuery({
+        queryKey: ["projects", projectId],
+        enabled,
+        queryFn: async () => {
+            const res = await http.get(`/projects/${projectId}`, {
+                headers: {Authorization: `Bearer ${accessToken}`},
+            });
+
+            const data = res.data?.data ?? res.data ?? null;
+            if (!data) throw new Error("No project found");
+
+            return normalizeProject(data);
+        },
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
+        onError: (err) => {
+            toast.error(errText(err) || "Failed to load project");
+        },
+    });
+}
+
 export function useUserById(userId) {
     const ctx = getUserCtx();
     const accessToken = ctx?.accessToken || "";
@@ -65,61 +94,6 @@ export function useUserById(userId) {
         },
         staleTime: 60_000,
         refetchOnWindowFocus: false,
-    });
-}
-
-// ---------- Update project ----------
-export function useUpdateProject() {
-    const ctx = getUserCtx();
-    const accessToken = ctx?.accessToken || "";
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async ({id, payload}) => {
-            if (!accessToken) throw new Error("No access token");
-            if (!id) throw new Error("Missing project id");
-
-            const res = await http.put(`/projects/${id}`, payload, {
-                headers: {Authorization: `Bearer ${accessToken}`},
-            });
-
-            return res.data;
-        },
-        onSuccess: (_, {id}) => {
-            toast.success("Project updated successfully");
-            queryClient.invalidateQueries(["projects", "all"]);
-            queryClient.invalidateQueries(["projects", id]);
-        },
-        onError: (error) => {
-            toast.error(errText(error) || "Failed to update project");
-        },
-    });
-}
-
-// ---------- Delete project ----------
-export function useDeleteProject() {
-    const ctx = getUserCtx();
-    const accessToken = ctx?.accessToken || "";
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async (id) => {
-            if (!accessToken) throw new Error("No access token");
-            if (!id) throw new Error("Missing project id");
-
-            const res = await http.delete(`/projects/${id}`, {
-                headers: {Authorization: `Bearer ${accessToken}`},
-            });
-
-            return res.data;
-        },
-        onSuccess: () => {
-            toast.success("Project deleted successfully");
-            queryClient.invalidateQueries(["projects", "all"]);
-        },
-        onError: (error) => {
-            toast.error(errText(error) || "Failed to delete project");
-        },
     });
 }
 
@@ -152,7 +126,6 @@ function normalizeProjectMember(row = {}) {
     };
 }
 
-// GET /projects/{project_id}/members
 export function useProjectMembers(projectId) {
     const ctx = getUserCtx();
     const accessToken = ctx?.accessToken || "";
@@ -176,8 +149,63 @@ export function useProjectMembers(projectId) {
     });
 }
 
-// POST /projects/{project_id}/members
-// Backend wants: { user_id, dept_id } (designation_id optional)
+// ---------- Mutations: Projects ----------
+
+export function useUpdateProject() {
+    const ctx = getUserCtx();
+    const accessToken = ctx?.accessToken || "";
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({id, payload}) => {
+            if (!accessToken) throw new Error("No access token");
+            if (!id) throw new Error("Missing project id");
+
+            const res = await http.put(`/projects/${id}`, payload, {
+                headers: {Authorization: `Bearer ${accessToken}`},
+            });
+
+            return res.data;
+        },
+        onSuccess: (_, {id}) => {
+            toast.success("Project updated successfully");
+            queryClient.invalidateQueries(["projects", "all"]);
+            queryClient.invalidateQueries(["projects", id]);
+        },
+        onError: (error) => {
+            toast.error(errText(error) || "Failed to update project");
+        },
+    });
+}
+
+export function useDeleteProject() {
+    const ctx = getUserCtx();
+    const accessToken = ctx?.accessToken || "";
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (id) => {
+            if (!accessToken) throw new Error("No access token");
+            if (!id) throw new Error("Missing project id");
+
+            const res = await http.delete(`/projects/${id}`, {
+                headers: {Authorization: `Bearer ${accessToken}`},
+            });
+
+            return res.data;
+        },
+        onSuccess: () => {
+            toast.success("Project deleted successfully");
+            queryClient.invalidateQueries(["projects", "all"]);
+        },
+        onError: (error) => {
+            toast.error(errText(error) || "Failed to delete project");
+        },
+    });
+}
+
+// ---------- Mutations: Members ----------
+
 export function useAddProjectMember() {
     const ctx = getUserCtx();
     const accessToken = ctx?.accessToken || "";
@@ -235,8 +263,6 @@ export function useAddProjectMember() {
     });
 }
 
-// DELETE /projects/{project_id}/members/{user_id}
-// Backend wants NO body, just path params.
 export function useRemoveProjectMember() {
     const ctx = getUserCtx();
     const accessToken = ctx?.accessToken || "";
@@ -268,6 +294,39 @@ export function useRemoveProjectMember() {
         },
         onError: (error) => {
             toast.error(errText(error) || "Failed to remove member");
+        },
+    });
+}
+
+// ---------- New: Create Sub Project ----------
+
+export function useCreateSubProject() {
+    const ctx = getUserCtx();
+    const accessToken = ctx?.accessToken || "";
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (payload) => {
+            if (!accessToken) throw new Error("No access token");
+
+            const res = await http.post("/sub-projects", payload, {
+                headers: {Authorization: `Bearer ${accessToken}`},
+            });
+
+            return res.data;
+        },
+        onSuccess: (data, variables) => {
+            toast.success("Sub project created successfully");
+            queryClient.invalidateQueries(["sub-projects"]);
+
+            const pid = variables?.project_id || variables?.projectId;
+            if (pid) {
+                queryClient.invalidateQueries(["projects", pid]);
+            }
+            queryClient.invalidateQueries(["projects", "all"]);
+        },
+        onError: (error) => {
+            toast.error(errText(error) || "Failed to create sub project");
         },
     });
 }

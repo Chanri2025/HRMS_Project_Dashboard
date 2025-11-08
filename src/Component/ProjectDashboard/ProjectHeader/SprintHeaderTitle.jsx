@@ -1,3 +1,4 @@
+// src/Component/ProjectDashboard/ProjectHeader/SprintHeaderTitle.jsx
 import React from "react";
 import {Badge} from "@/components/ui/badge.tsx";
 import {Calendar} from "lucide-react";
@@ -8,8 +9,8 @@ export function SprintHeaderTitle({
                                       selectedProject,
                                       activeCount,
                                       createdByUser,
-                                      dateRange,
-                                      daysRemaining,
+                                      createdOnLabel,
+                                      daysElapsed,
                                   }) {
     const projectName =
         loading
@@ -31,6 +32,7 @@ export function SprintHeaderTitle({
     return (
         <div className="flex items-center gap-4">
             <div>
+                {/* Title + status + created by + active projects */}
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <h2 className="text-xl font-bold text-foreground">
                         {projectName}
@@ -58,20 +60,29 @@ export function SprintHeaderTitle({
                     )}
                 </div>
 
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                {/* Created on + days elapsed */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
                     <Calendar className="h-4 w-4"/>
-                    <span>{dateRange || "Timeline not available"}</span>
-                    {typeof daysRemaining === "number" && (
+
+                    {createdOnLabel ? (
                         <>
-                            <span className="text-muted-foreground/50">•</span>
-                            <span>
-                {daysRemaining} day
-                                {daysRemaining === 1 ? "" : "s"} remaining
-              </span>
+                            <span>Created on {createdOnLabel}</span>
+                            {typeof daysElapsed === "number" && (
+                                <>
+                                    <span className="text-muted-foreground/50">•</span>
+                                    <span>
+                    {daysElapsed} day
+                                        {daysElapsed === 1 ? "" : "s"} elapsed
+                  </span>
+                                </>
+                            )}
                         </>
+                    ) : (
+                        <span>Created date not available</span>
                     )}
                 </div>
 
+                {/* Description */}
                 {selectedProject?.description && (
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
                         {selectedProject.description}

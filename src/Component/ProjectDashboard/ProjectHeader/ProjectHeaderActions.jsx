@@ -1,3 +1,4 @@
+// src/Component/ProjectDashboard/ProjectHeader/ProjectHeaderActions.jsx
 import React, {useEffect, useState, useMemo} from "react";
 import {Button} from "@/components/ui/button.tsx";
 import {
@@ -38,6 +39,7 @@ import {
     useUserById,
 } from "@/hooks/useActiveProjects.js";
 import {useDeptMembers} from "@/hooks/useDeptMembers.js";
+import {SubProjectCreateDialog} from "@/Component/ProjectDashboard/ProjectHeader/SubProjectCreateDialog.jsx";
 
 /** Display pill for a member */
 function ProjectMemberPill({member, onRemove}) {
@@ -46,6 +48,7 @@ function ProjectMemberPill({member, onRemove}) {
 
     const name =
         member.fullName ||
+        userData?.employee?.full_name ||
         userData?.full_name ||
         member.email ||
         "Member";
@@ -54,10 +57,10 @@ function ProjectMemberPill({member, onRemove}) {
 
     return (
         <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-xs">
-      <span>
-        {name}
-          {email ? ` (${email})` : ""}
-      </span>
+            <span>
+                {name}
+                {email ? ` (${email})` : ""}
+            </span>
             <button
                 type="button"
                 onClick={onRemove}
@@ -78,6 +81,7 @@ export function ProjectHeaderActions({
                                      }) {
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [createOpen, setCreateOpen] = useState(false);
 
     const [editForm, setEditForm] = useState({
         name: "",
@@ -137,7 +141,7 @@ export function ProjectHeaderActions({
         await deleteProject.mutateAsync(projectId);
     };
 
-    // Build options from /auth/members
+    // Build dept member options for "Add member"
     const memberOptions = useMemo(() => {
         return (deptMembers || [])
             .map((m) => {
@@ -208,6 +212,7 @@ export function ProjectHeaderActions({
     return (
         <>
             <div className="flex items-center gap-2">
+                {/* Project selector + actions */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button
@@ -273,9 +278,14 @@ export function ProjectHeaderActions({
                     </DropdownMenuContent>
                 </DropdownMenu>
 
-                <Button size="sm">
+                {/* Create Sub Project */}
+                <Button
+                    size="sm"
+                    disabled={!selectedProject?.id}
+                    onClick={() => setCreateOpen(true)}
+                >
                     <Plus className="h-4 w-4 mr-1"/>
-                    Create Task
+                    Create Sub Project
                 </Button>
             </div>
 
@@ -291,7 +301,6 @@ export function ProjectHeaderActions({
                         </DialogHeader>
 
                         <div className="space-y-3 mt-2">
-                            {/* Project Name */}
                             <div>
                                 <label className="block text-xs font-medium mb-1">
                                     Project Name
@@ -305,7 +314,6 @@ export function ProjectHeaderActions({
                                 />
                             </div>
 
-                            {/* Description */}
                             <div>
                                 <label className="block text-xs font-medium mb-1">
                                     Description
@@ -319,7 +327,6 @@ export function ProjectHeaderActions({
                                 />
                             </div>
 
-                            {/* Status */}
                             <div>
                                 <label className="block text-xs font-medium mb-1">
                                     Status
@@ -340,7 +347,6 @@ export function ProjectHeaderActions({
                                 </Select>
                             </div>
 
-                            {/* Members */}
                             <div>
                                 <label className="block text-xs font-medium mb-1">
                                     Members
@@ -366,7 +372,6 @@ export function ProjectHeaderActions({
                                     </div>
                                 )}
 
-                                {/* Add member */}
                                 <div className="mt-3">
                                     <label className="block text-[10px] font-medium mb-1 text-muted-foreground">
                                         Add member from your department
@@ -434,6 +439,14 @@ export function ProjectHeaderActions({
                     </form>
                 </DialogContent>
             </Dialog>
+
+            {/* Create Sub Project Modal (separate file) */}
+            <SubProjectCreateDialog
+                open={createOpen}
+                onOpenChange={setCreateOpen}
+                projectId={projectId}
+                projectMembers={projectMembers}
+            />
 
             {/* Delete Confirm */}
             <ConfirmDialog

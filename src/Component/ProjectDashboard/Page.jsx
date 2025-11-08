@@ -4,7 +4,12 @@ import {KanbanColumn} from "@/Component/ProjectDashboard/KanbanColumn.jsx";
 import {TaskCard} from "@/Component/ProjectDashboard/TaskCard.jsx";
 import {GanttView} from "@/Component/ProjectDashboard/GanttView.jsx";
 import {TableView} from "@/Component/ProjectDashboard/TableView.jsx";
-import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs.tsx";
+import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from "@/components/ui/tabs.tsx";
 import {
     DndContext,
     DragOverlay,
@@ -17,116 +22,80 @@ import {
     verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
-import {useActiveProjects} from "@/hooks/useActiveProjects";
+import {
+    useActiveProjects,
+    useProjectById,
+} from "@/hooks/useActiveProjects";
 
-// Demo tasks for now (later you can map by project.id)
-const initialTasks = [
-    {
-        id: "1",
-        title: "Implement user profile settings",
-        description:
-            "Add ability for users to update their profile information and preferences",
-        priority: "medium",
-        status: "backlog",
-        assignee: {name: "Alex Chen", initials: "AC"},
-        storyPoints: 5,
-        comments: 3,
-        startDate: new Date(2025, 9, 20),
-        endDate: new Date(2025, 9, 25),
-    },
-    {
-        id: "2",
-        title: "Database optimization",
-        description: "Optimize database queries for better performance",
-        priority: "low",
-        status: "backlog",
-        assignee: {name: "Sam Wilson", initials: "SW"},
-        storyPoints: 8,
-        comments: 1,
-        startDate: new Date(2025, 9, 21),
-        endDate: new Date(2025, 9, 28),
-    },
-    {
-        id: "3",
-        title: "Design new onboarding flow",
-        description:
-            "Create wireframes and mockups for improved user onboarding experience",
-        priority: "high",
-        status: "todo",
-        assignee: {name: "Jordan Lee", initials: "JL"},
-        storyPoints: 8,
-        comments: 5,
-        startDate: new Date(2025, 9, 22),
-        endDate: new Date(2025, 9, 29),
-    },
-    {
-        id: "4",
-        title: "API documentation",
-        description: "Complete API documentation for v2 endpoints",
-        priority: "medium",
-        status: "todo",
-        assignee: {name: "Taylor Kim", initials: "TK"},
-        storyPoints: 3,
-        comments: 2,
-        startDate: new Date(2025, 9, 23),
-        endDate: new Date(2025, 9, 26),
-    },
-    {
-        id: "5",
-        title: "Authentication system upgrade",
-        description:
-            "Migrate to new OAuth 2.0 implementation with improved security",
-        priority: "urgent",
-        status: "in-progress",
-        assignee: {name: "Morgan Park", initials: "MP"},
-        storyPoints: 13,
-        comments: 8,
-        startDate: new Date(2025, 9, 18),
-        endDate: new Date(2025, 9, 30),
-    },
-    {
-        id: "6",
-        title: "Mobile responsive fixes",
-        description: "Fix layout issues on mobile devices for dashboard",
-        priority: "high",
-        status: "in-progress",
-        assignee: {name: "Casey Brown", initials: "CB"},
-        storyPoints: 5,
-        comments: 4,
-        startDate: new Date(2025, 9, 19),
-        endDate: new Date(2025, 9, 24),
-    },
-    {
-        id: "7",
-        title: "Add dark mode support",
-        description: "Implement dark mode theme across all pages",
-        priority: "medium",
-        status: "done",
-        assignee: {name: "Riley Davis", initials: "RD"},
-        storyPoints: 8,
-        comments: 12,
-        startDate: new Date(2025, 9, 10),
-        endDate: new Date(2025, 9, 18),
-    },
-    {
-        id: "8",
-        title: "Email notification system",
-        description: "Set up automated email notifications for task updates",
-        priority: "high",
-        status: "done",
-        assignee: {name: "Jordan Lee", initials: "JL"},
-        storyPoints: 5,
-        comments: 6,
-        startDate: new Date(2025, 9, 12),
-        endDate: new Date(2025, 9, 19),
-    },
-];
+// Map API subprojects -> board tasks
+function mapSubprojectsToTasks(subprojects = []) {
+    return subprojects.map((sp) => {
+        const rawStatus = (
+            sp.project_status ||
+            sp.status ||
+            ""
+        )
+            .toLowerCase()
+            .trim();
+
+        // Default To Do
+        let status = "todo";
+
+        if (rawStatus === "to do" || rawStatus === "todo") {
+            status = "todo";
+        } else if (rawStatus === "development" || rawStatus === "dev") {
+            status = "in-progress";
+        } else if (rawStatus === "testing" || rawStatus === "qa") {
+            status = "in-progress";
+        } else if (
+            rawStatus === "deployment" ||
+            rawStatus === "deployed" ||
+            rawStatus === "done" ||
+            rawStatus === "completed"
+        ) {
+            status = "done";
+        } else if (rawStatus === "backlog") {
+            status = "backlog";
+        }
+
+        const start =
+            sp.created_on || sp.createdOn
+                ? new Date(sp.created_on || sp.createdOn)
+                : new Date();
+
+        const end = sp.subproject_deadline
+            ? new Date(sp.subproject_deadline)
+            : start;
+
+        const assigneeId = sp.assigned_to ?? sp.assignedTo ?? null;
+
+        const title =
+            sp.subproject_name ||
+            (sp.description
+                ? sp.description.slice(0, 40) +
+                (sp.description.length > 40 ? "..." : "")
+                : "Subproject");
+
+        return {
+            id: String(sp.subproject_id ?? sp.id),
+            title,
+            description: sp.description || "",
+            priority: "medium",
+            status,
+            assigneeId,
+            startDate: start,
+            endDate: end,
+            storyPoints: 0,
+            comments: 0,
+        };
+    });
+}
 
 export default function Page() {
-    const [tasks, setTasks] = useState(initialTasks);
+    const [tasks, setTasks] = useState([]);
     const [activeId, setActiveId] = useState(null);
 
-    // 🔹 Load active projects from API
+    // Load active projects
     const {
         activeProjects,
         activeCount,
@@ -134,20 +103,37 @@ export default function Page() {
         isError: projectsError,
     } = useActiveProjects();
 
-    // 🔹 Selected project state
+    // Selected project
     const [selectedProjectId, setSelectedProjectId] = useState(null);
 
-    // Set default selected project when data arrives
     useEffect(() => {
         if (!projectsLoading && !projectsError && activeProjects?.length > 0) {
             setSelectedProjectId((prev) => prev ?? activeProjects[0].id);
         }
     }, [projectsLoading, projectsError, activeProjects]);
 
-    const selectedProject =
+    // Detailed project with subprojects
+    const {
+        data: detailedProject,
+        isLoading: projectDetailLoading,
+        isError: projectDetailError,
+    } = useProjectById(selectedProjectId);
+
+    const baseSelectedProject =
         activeProjects?.find((p) => p.id === selectedProjectId) ||
         activeProjects?.[0] ||
         null;
+
+    const selectedProject = detailedProject || baseSelectedProject || null;
+
+    // Whenever selectedProject.subprojects changes, rebuild tasks
+    useEffect(() => {
+        if (selectedProject?.subprojects) {
+            setTasks(mapSubprojectsToTasks(selectedProject.subprojects));
+        } else {
+            setTasks([]);
+        }
+    }, [selectedProject?.subprojects]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -194,11 +180,14 @@ export default function Page() {
 
     const activeTask = tasks.find((t) => t.id === activeId);
 
+    const headerLoading = projectsLoading || projectDetailLoading;
+    const headerError = projectsError || projectDetailError;
+
     return (
         <div className="flex flex-col h-screen">
             <ProjectHeader
-                loading={projectsLoading}
-                error={projectsError}
+                loading={headerLoading}
+                error={headerError}
                 projects={activeProjects}
                 activeCount={activeCount}
                 selectedProject={selectedProject}
