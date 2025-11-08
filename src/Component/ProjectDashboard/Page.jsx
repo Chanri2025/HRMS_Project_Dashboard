@@ -1,5 +1,5 @@
 import React, {useState, useMemo, useEffect} from "react";
-import {SprintHeader} from "@/Component/ProjectDashboard/SprintHeader.jsx";
+import {ProjectHeader} from "@/Component/ProjectDashboard/ProjectHeader/ProjectHeader.jsx";
 import {KanbanColumn} from "@/Component/ProjectDashboard/KanbanColumn.jsx";
 import {TaskCard} from "@/Component/ProjectDashboard/TaskCard.jsx";
 import {GanttView} from "@/Component/ProjectDashboard/GanttView.jsx";
@@ -196,7 +196,7 @@ export default function Page() {
 
     return (
         <div className="flex flex-col h-screen">
-            <SprintHeader
+            <ProjectHeader
                 loading={projectsLoading}
                 error={projectsError}
                 projects={activeProjects}

@@ -1,58 +1,69 @@
 import {useMemo} from "react";
 import {useQuery} from "@tanstack/react-query";
 import {http, getUserCtx} from "@/lib/http";
+import {toast} from "sonner";
+import {errText} from "@/lib/errText";
 
-/** Safely read dept_id from session/local storage */
-function getDeptIdFromStorage() {
-    const raw = getUserCtx().raw || {};
-    return raw?.employee?.dept_id ?? raw?.dept_id ?? null;
-}
+/**
+ * Resolve dept_id from user context / raw storage.
+ */
+function getDeptIdFromCtx(ctx) {
+    const raw = ctx?.raw || {};
 
-/** Create initials from name */
-function initialsFromName(name = "") {
     return (
-        name
-            .trim()
-            .split(/\s+/)
-            .slice(0, 2)
-            .map((s) => s[0]?.toUpperCase())
-            .join("") || "TM"
+        ctx?.employee?.dept_id ??
+        ctx?.user?.employee?.dept_id ??
+        ctx?.me?.employee?.dept_id ??
+        ctx?.dept_id ??
+        raw?.employee?.dept_id ??
+        raw?.dept_id ??
+        null
     );
 }
 
-/** Normalize API row → { name, email, phone, deptId, initials } */
-function normalizeMember(row = {}) {
-    const name = row.full_name || row.name || "Member";
-    const email = row.email || "";
-    const phone = row.phone || "";
-    const deptId = row.dept_id ?? row.employee?.dept_id ?? null;
-    return {name, email, phone, deptId, initials: initialsFromName(name)};
-}
-
+/**
+ * useDeptMembers
+ *  - If deptIdOverride is provided, uses that.
+ *  - Otherwise infers dept_id from current user's context.
+ *  - Calls GET /auth/members?dept_id={dept_id}
+ *  - Returns backend rows as-is (including user_id, dept_id).
+ */
 export function useDeptMembers(deptIdOverride) {
     const ctx = getUserCtx();
     const accessToken = ctx?.accessToken || "";
+
     const deptId = useMemo(
-        () => deptIdOverride ?? getDeptIdFromStorage(),
-        [deptIdOverride]
+        () => deptIdOverride ?? getDeptIdFromCtx(ctx),
+        [deptIdOverride, ctx]
     );
 
-    const enabled = Boolean(deptId && accessToken);
+    const enabled = Boolean(accessToken) && Boolean(deptId);
 
-    const query = useQuery({
-        queryKey: ["auth", "members", {deptId}],
+    return useQuery({
+        queryKey: ["deptMembers", deptId],
         enabled,
         queryFn: async () => {
-            const res = await http.get("/auth/members", {
-                params: {dept_id: deptId},
-                headers: {Authorization: `Bearer ${accessToken}`},
-            });
-            const arr = Array.isArray(res.data) ? res.data : res.data?.data || [];
-            return arr.map(normalizeMember);
+            try {
+                const res = await http.get("/auth/members", {
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                    params: {dept_id: deptId},
+                });
+
+                const data = Array.isArray(res.data)
+                    ? res.data
+                    : Array.isArray(res.data?.data)
+                        ? res.data.data
+                        : [];
+
+                return data;
+            } catch (error) {
+                toast.error(errText(error) || "Failed to load department members");
+                throw error;
+            }
         },
         staleTime: 60_000,
         refetchOnWindowFocus: false,
     });
-
-    return {...query, deptId};
 }
