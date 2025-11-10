@@ -16,6 +16,7 @@ import {MetricStatCardSkeleton} from "@/Component/Dashboard/SkeletonLoading/Metr
 const Page = () => {
     const navigate = useNavigate();
 
+    // ---------- Dept members ----------
     const {
         data: deptMembers,
         isLoading: membersLoading,
@@ -29,6 +30,7 @@ const Page = () => {
         [deptMembers]
     );
 
+    // ---------- Active projects ----------
     const {
         activeCount,
         isLoading: projectsLoading,
@@ -36,15 +38,50 @@ const Page = () => {
         error: projectsErrorObj,
     } = useActiveProjects();
 
+    // ---------- Sub-projects (for completed stats) ----------
     const {
-        total: totalSubProjects,
-        completedCount,
-        completionPercent,
+        subProjects,
         isLoading: subsLoading,
         isError: subsError,
         error: subsErrorObj,
     } = useSubProjects();
 
+    const {
+        totalSubProjects,
+        completedSubProjectsCount,
+        completionPercent,
+    } = useMemo(() => {
+        const list = Array.isArray(subProjects) ? subProjects : [];
+
+        const total = list.length;
+
+        const completed = list.filter((sp) => {
+            // support both normalized + raw just in case
+            const raw =
+                (sp.status ||
+                    sp.project_status ||
+                    sp.projectStatus ||
+                    "") +
+                "";
+            const s = raw.toLowerCase().trim();
+            return (
+                s === "completed" ||
+                s === "done" ||
+                s === "deployment" ||
+                s === "deployed"
+            );
+        }).length;
+
+        const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        return {
+            totalSubProjects: total,
+            completedSubProjectsCount: completed,
+            completionPercent: pct,
+        };
+    }, [subProjects]);
+
+    // ---------- Metric cards ----------
     const metrics = useMemo(
         () => [
             {
@@ -64,7 +101,7 @@ const Page = () => {
                     ? "—"
                     : projectsError
                         ? "0"
-                        : String(activeCount),
+                        : String(activeCount || 0),
                 label: "Active Projects",
             },
             {
@@ -92,7 +129,7 @@ const Page = () => {
                     ? "—"
                     : membersError
                         ? "0"
-                        : String(memberCount),
+                        : String(memberCount || 0),
                 label: "Team Members",
             },
             {
@@ -112,7 +149,7 @@ const Page = () => {
                     ? "—"
                     : subsError
                         ? "0"
-                        : `${completedCount}/${totalSubProjects || 0}`,
+                        : `${completedSubProjectsCount}/${totalSubProjects || 0}`,
                 label: "Completed Sub-Projects",
             },
         ],
@@ -126,7 +163,7 @@ const Page = () => {
             subsLoading,
             subsError,
             completionPercent,
-            completedCount,
+            completedSubProjectsCount,
             totalSubProjects,
         ]
     );
@@ -182,27 +219,21 @@ const Page = () => {
             {membersError && (
                 <p className="text-xs text-destructive/80">
                     Failed to load team members
-                    {membersErrorObj?.message
-                        ? `: ${membersErrorObj.message}`
-                        : ""}.
+                    {membersErrorObj?.message ? `: ${membersErrorObj.message}` : ""}.
                 </p>
             )}
 
             {projectsError && (
                 <p className="text-xs text-destructive/80">
                     Failed to load projects
-                    {projectsErrorObj?.message
-                        ? `: ${projectsErrorObj.message}`
-                        : ""}.
+                    {projectsErrorObj?.message ? `: ${projectsErrorObj.message}` : ""}.
                 </p>
             )}
 
             {subsError && (
                 <p className="text-xs text-destructive/80">
                     Failed to load sub-projects
-                    {subsErrorObj?.message
-                        ? `: ${subsErrorObj.message}`
-                        : ""}.
+                    {subsErrorObj?.message ? `: ${subsErrorObj.message}` : ""}.
                 </p>
             )}
         </div>

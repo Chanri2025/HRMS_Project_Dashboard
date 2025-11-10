@@ -33,19 +33,31 @@ import {
 } from "@/hooks/useActiveProjects.js";
 
 import {SubProjectCreateDialog} from "@/Component/ProjectDashboard/ProjectHeader/SubProjectCreateDialog.jsx";
+import {useUpdateSubProjectStatus} from "@/hooks/useSubProjects.js";
 
-// ---------- Map API subprojects -> board tasks (statuses aligned with dropdown) ----------
+// ---------- Map column id -> API project_status ----------
+function mapColumnToProjectStatus(columnId) {
+    switch (columnId) {
+        case "backlog":
+            return "Backlog";
+        case "todo":
+            return "To Do";
+        case "in-progress":
+            return "Development"; // or "In Progress"
+        case "done":
+            return "Completed";
+        default:
+            return null;
+    }
+}
+
+// ---------- Map API/normalized subprojects -> board tasks ----------
 function mapSubprojectsToTasks(subprojects = []) {
     return subprojects.map((sp) => {
-        const rawStatus = (
-            sp.project_status ||
-            sp.status ||
-            ""
-        )
+        const rawStatus = (sp.project_status || sp.status || "")
             .toLowerCase()
             .trim();
 
-        // Kanban column key (only these four)
         let status = "todo";
 
         if (rawStatus === "to do" || rawStatus === "todo") {
@@ -66,18 +78,39 @@ function mapSubprojectsToTasks(subprojects = []) {
         }
 
         const start =
-            sp.created_on || sp.createdOn
-                ? new Date(sp.created_on || sp.createdOn)
+            sp.created_on ||
+            sp.createdOn ||
+            sp.created_at ||
+            sp.createdAt
+                ? new Date(
+                    sp.created_on ||
+                    sp.createdOn ||
+                    sp.created_at ||
+                    sp.createdAt
+                )
                 : new Date();
 
-        const end = sp.subproject_deadline
-            ? new Date(sp.subproject_deadline)
-            : start;
+        const end =
+            sp.subproject_deadline ||
+            sp.deadline ||
+            sp.endDate
+                ? new Date(
+                    sp.subproject_deadline ||
+                    sp.deadline ||
+                    sp.endDate
+                )
+                : start;
 
-        const assigneeId = sp.assigned_to ?? sp.assignedTo ?? null;
+        const assigneeId =
+            sp.assigned_to ??
+            sp.assignedTo ??
+            sp.assigned_to_id ??
+            null;
 
         const title =
             sp.subproject_name ||
+            sp.subprojectName ||
+            sp.name ||
             (sp.description
                 ? sp.description.slice(0, 40) +
                 (sp.description.length > 40 ? "..." : "")
@@ -88,12 +121,12 @@ function mapSubprojectsToTasks(subprojects = []) {
             title,
             description: sp.description || "",
             priority: "medium",
-            status, // one of: backlog | todo | in-progress | done
+            status, // backlog | todo | in-progress | done
             assigneeId,
             startDate: start,
             endDate: end,
-            storyPoints: 0,
-            comments: 0,
+            storyPoints: sp.storyPoints || 0,
+            comments: sp.commentsCount || 0,
         };
     });
 }
@@ -104,7 +137,6 @@ export default function Page() {
     const [selectedProjectId, setSelectedProjectId] = useState(null);
     const [createOpen, setCreateOpen] = useState(false);
 
-    // ---------- Load active projects ----------
     const {
         activeProjects,
         activeCount,
@@ -112,14 +144,13 @@ export default function Page() {
         isError: projectsError,
     } = useActiveProjects();
 
-    // Default select first active project
+    // Select first active project by default
     useEffect(() => {
         if (!projectsLoading && !projectsError && activeProjects?.length > 0) {
             setSelectedProjectId((prev) => prev ?? activeProjects[0].id);
         }
     }, [projectsLoading, projectsError, activeProjects]);
 
-    // ---------- Detailed project ----------
     const {
         data: detailedProject,
         isLoading: projectDetailLoading,
@@ -133,7 +164,7 @@ export default function Page() {
 
     const selectedProject = detailedProject || baseSelectedProject || null;
 
-    // ---------- Project members for dialog dropdowns ----------
+    // Members for create dialog
     const {data: membersData} = useProjectMembers(selectedProject?.id, {
         enabled: !!selectedProject?.id,
     });
@@ -144,14 +175,22 @@ export default function Page() {
         selectedProject?.members ||
         [];
 
-    // ---------- Build tasks whenever subprojects change ----------
+    // ---------- Build tasks whenever selectedProject changes ----------
     useEffect(() => {
-        if (selectedProject?.subprojects) {
-            setTasks(mapSubprojectsToTasks(selectedProject.subprojects));
+        // support various backend shapes: subprojects, sub_projects, etc.
+        const rawSubprojects =
+            selectedProject?.subprojects ||
+            selectedProject?.sub_projects ||
+            selectedProject?.SubProjects ||
+            selectedProject?.subProjects ||
+            [];
+
+        if (Array.isArray(rawSubprojects) && rawSubprojects.length > 0) {
+            setTasks(mapSubprojectsToTasks(rawSubprojects));
         } else {
             setTasks([]);
         }
-    }, [selectedProject?.subprojects]);
+    }, [selectedProject]);
 
     // ---------- DnD ----------
     const sensors = useSensors(
@@ -170,21 +209,37 @@ export default function Page() {
         [tasks]
     );
 
+    const {mutate: mutateStatus} = useUpdateSubProjectStatus();
+
     const handleDragStart = (event) => {
         setActiveId(event.active.id);
     };
 
     const handleDragEnd = (event) => {
         const {active, over} = event;
-        if (!over) return;
+        if (!over) {
+            setActiveId(null);
+            return;
+        }
 
         const activeTask = tasks.find((t) => t.id === active.id);
-        const overContainer = over.id;
+        if (!activeTask) {
+            setActiveId(null);
+            return;
+        }
 
-        if (
-            activeTask &&
-            ["backlog", "todo", "in-progress", "done"].includes(overContainer)
-        ) {
+        let overContainer = over.id;
+
+        // If dropped over another card, derive its column
+        if (!["backlog", "todo", "in-progress", "done"].includes(overContainer)) {
+            const overTask = tasks.find((t) => t.id === overContainer);
+            if (overTask) overContainer = overTask.status;
+        }
+
+        if (["backlog", "todo", "in-progress", "done"].includes(overContainer)) {
+            const project_status = mapColumnToProjectStatus(overContainer);
+
+            // optimistic update
             setTasks((prev) =>
                 prev.map((task) =>
                     task.id === activeTask.id
@@ -192,7 +247,14 @@ export default function Page() {
                         : task
                 )
             );
-            // here you can also call your update-subproject-status API if needed
+
+            if (project_status) {
+                mutateStatus({
+                    id: activeTask.id,
+                    project_status,
+                    projectId: selectedProject?.id,
+                });
+            }
         }
 
         setActiveId(null);
@@ -213,11 +275,9 @@ export default function Page() {
                 selectedProject={selectedProject}
                 onSelectProject={setSelectedProjectId}
                 tasks={tasks}
-                // hook the "Create Sub Project" button in header to this:
                 onCreateSubProject={() => setCreateOpen(true)}
             />
 
-            {/* Create Sub Project Modal */}
             <SubProjectCreateDialog
                 open={createOpen}
                 onOpenChange={setCreateOpen}
@@ -254,7 +314,7 @@ export default function Page() {
                                     color="bg-muted"
                                 >
                                     {tasksByStatus.backlog.map((task) => (
-                                        <TaskCard key={task.id} {...task} />
+                                        <TaskCard key={task.id} {...task} status={task.status}/>
                                     ))}
                                 </KanbanColumn>
                             </SortableContext>
@@ -271,7 +331,7 @@ export default function Page() {
                                     color="bg-warning"
                                 >
                                     {tasksByStatus.todo.map((task) => (
-                                        <TaskCard key={task.id} {...task} />
+                                        <TaskCard key={task.id} {...task} status={task.status}/>
                                     ))}
                                 </KanbanColumn>
                             </SortableContext>
@@ -288,7 +348,7 @@ export default function Page() {
                                     color="bg-info"
                                 >
                                     {tasksByStatus.inProgress.map((task) => (
-                                        <TaskCard key={task.id} {...task} />
+                                        <TaskCard key={task.id} {...task} status={task.status}/>
                                     ))}
                                 </KanbanColumn>
                             </SortableContext>
@@ -305,14 +365,16 @@ export default function Page() {
                                     color="bg-success"
                                 >
                                     {tasksByStatus.done.map((task) => (
-                                        <TaskCard key={task.id} {...task} />
+                                        <TaskCard key={task.id} {...task} status={task.status}/>
                                     ))}
                                 </KanbanColumn>
                             </SortableContext>
                         </div>
 
                         <DragOverlay>
-                            {activeTask ? <TaskCard {...activeTask} /> : null}
+                            {activeTask ? (
+                                <TaskCard {...activeTask} status={activeTask.status}/>
+                            ) : null}
                         </DragOverlay>
                     </DndContext>
                 </TabsContent>
