@@ -18,7 +18,7 @@ export function normalizeSubProject(row = {}) {
     };
 }
 
-// ---------- Fetch all sub-projects (optional global list) ----------
+// All subprojects (optional)
 export function useSubProjects() {
     const ctx = getUserCtx();
     const accessToken = ctx?.accessToken || "";
@@ -48,7 +48,7 @@ export function useSubProjects() {
     };
 }
 
-// ---------- Create Sub Project ----------
+// Create
 export function useCreateSubProject() {
     const ctx = getUserCtx();
     const accessToken = ctx?.accessToken || "";
@@ -66,17 +66,12 @@ export function useCreateSubProject() {
         },
         onSuccess: (data, variables) => {
             toast.success("Sub project created successfully");
-
-            // global list
             queryClient.invalidateQueries(["sub-projects"]);
 
             const pid = variables?.project_id || variables?.projectId;
             if (pid) {
-                // project detail (with subprojects)
                 queryClient.invalidateQueries(["projects", pid]);
             }
-
-            // projects overview
             queryClient.invalidateQueries(["projects", "all"]);
         },
         onError: (error) => {
@@ -85,21 +80,17 @@ export function useCreateSubProject() {
     });
 }
 
-// ---------- Update Sub Project Status (Kanban drag & drop) ----------
+// Drag & drop status update: PUT /sub-projects/:id { project_status }
 export function useUpdateSubProjectStatus() {
     const ctx = getUserCtx();
     const accessToken = ctx?.accessToken || "";
     const queryClient = useQueryClient();
 
     return useMutation({
-        // expects: { id, project_status, projectId? }
         mutationFn: async ({id, project_status}) => {
             if (!accessToken) throw new Error("No access token");
-            if (!id) throw new Error("No sub-project id");
-            if (!project_status) throw new Error("No project_status");
+            if (!id) throw new Error("Missing subproject id");
 
-            // PUT {{test_server}}sub-projects/:id
-            // { "project_status": "Completed" }
             const res = await http.put(
                 `/sub-projects/${id}`,
                 {project_status},
@@ -108,40 +99,57 @@ export function useUpdateSubProjectStatus() {
 
             return res.data;
         },
-
-        onSuccess: (data, variables) => {
-            const statusLabel =
-                variables?.project_status ||
-                data?.project_status ||
-                data?.status;
-
+        onSuccess: (_, variables) => {
             toast.success(
-                statusLabel
-                    ? `Sub project status updated to "${statusLabel}".`
-                    : "Sub project status updated."
+                `Sub project status updated to "${variables.project_status}".`
             );
-
-            // Refresh global sub-project list
             queryClient.invalidateQueries(["sub-projects"]);
-
-            // Determine which project detail to refresh
-            const pid =
-                variables?.projectId ||
-                data?.project_id ||
-                data?.projectId ||
-                null;
-
-            if (pid) {
-                queryClient.invalidateQueries(["projects", pid]);
+            if (variables.projectId) {
+                queryClient.invalidateQueries(["projects", variables.projectId]);
             }
-
-            // Refresh projects overview
             queryClient.invalidateQueries(["projects", "all"]);
         },
-
         onError: (error) => {
             toast.error(
                 errText(error) || "Failed to update sub project status"
+            );
+        },
+    });
+}
+
+// Full update from details modal: PUT /sub-projects/:id { ...fields }
+export function useUpdateSubProject() {
+    const ctx = getUserCtx();
+    const accessToken = ctx?.accessToken || "";
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({id, data}) => {
+            if (!accessToken) throw new Error("No access token");
+            if (!id) throw new Error("Missing subproject id");
+
+            const res = await http.put(`/sub-projects/${id}`, data, {
+                headers: {Authorization: `Bearer ${accessToken}`},
+            });
+
+            return res.data;
+        },
+        onSuccess: (data, {id, projectId}) => {
+            toast.success("Sub project updated successfully");
+            queryClient.invalidateQueries(["sub-projects"]);
+            if (projectId || data?.project_id) {
+                queryClient.invalidateQueries([
+                    "projects",
+                    projectId || data.project_id,
+                ]);
+            }
+            if (data?.project_id || projectId) {
+                queryClient.invalidateQueries(["projects", "all"]);
+            }
+        },
+        onError: (error) => {
+            toast.error(
+                errText(error) || "Failed to update sub project"
             );
         },
     });

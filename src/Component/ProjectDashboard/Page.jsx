@@ -33,7 +33,9 @@ import {
 } from "@/hooks/useActiveProjects.js";
 
 import {SubProjectCreateDialog} from "@/Component/ProjectDashboard/ProjectHeader/SubProjectCreateDialog.jsx";
-import {useUpdateSubProjectStatus} from "@/hooks/useSubProjects.js";
+import {
+    useUpdateSubProjectStatus,
+} from "@/hooks/useSubProjects.js";
 
 // ---------- Map column id -> API project_status ----------
 function mapColumnToProjectStatus(columnId) {
@@ -117,7 +119,25 @@ function mapSubprojectsToTasks(subprojects = []) {
                 : "Subproject");
 
         return {
+            // core identity
             id: String(sp.subproject_id ?? sp.id),
+
+            // for detail modal (read-only fields)
+            projectId: sp.project_id ?? null,
+            assignedBy: sp.assigned_by ?? null,
+            createdOn:
+                sp.created_on ||
+                sp.createdOn ||
+                sp.created_at ||
+                sp.createdAt ||
+                null,
+            lastModified:
+                sp.last_modified ||
+                sp.updatedAt ||
+                sp.updated_at ||
+                null,
+
+            // display + editable fields
             title,
             description: sp.description || "",
             priority: "medium",
@@ -294,7 +314,10 @@ export default function Page() {
                 </div>
 
                 {/* Kanban View */}
-                <TabsContent value="kanban" className="flex-1 overflow-x-auto m-0">
+                <TabsContent
+                    value="kanban"
+                    className="flex-1 overflow-x-auto m-0"
+                >
                     <DndContext
                         sensors={sensors}
                         onDragStart={handleDragStart}
@@ -313,7 +336,11 @@ export default function Page() {
                                     color="bg-muted"
                                 >
                                     {tasksByStatus.backlog.map((task) => (
-                                        <TaskCard key={task.id} {...task} status={task.status}/>
+                                        <TaskCard
+                                            key={task.id}
+                                            {...task}
+                                            status={task.status}
+                                        />
                                     ))}
                                 </KanbanColumn>
                             </SortableContext>
@@ -330,7 +357,11 @@ export default function Page() {
                                     color="bg-warning"
                                 >
                                     {tasksByStatus.todo.map((task) => (
-                                        <TaskCard key={task.id} {...task} status={task.status}/>
+                                        <TaskCard
+                                            key={task.id}
+                                            {...task}
+                                            status={task.status}
+                                        />
                                     ))}
                                 </KanbanColumn>
                             </SortableContext>
@@ -347,7 +378,11 @@ export default function Page() {
                                     color="bg-info"
                                 >
                                     {tasksByStatus.inProgress.map((task) => (
-                                        <TaskCard key={task.id} {...task} status={task.status}/>
+                                        <TaskCard
+                                            key={task.id}
+                                            {...task}
+                                            status={task.status}
+                                        />
                                     ))}
                                 </KanbanColumn>
                             </SortableContext>
@@ -364,7 +399,11 @@ export default function Page() {
                                     color="bg-success"
                                 >
                                     {tasksByStatus.done.map((task) => (
-                                        <TaskCard key={task.id} {...task} status={task.status}/>
+                                        <TaskCard
+                                            key={task.id}
+                                            {...task}
+                                            status={task.status}
+                                        />
                                     ))}
                                 </KanbanColumn>
                             </SortableContext>
@@ -372,19 +411,28 @@ export default function Page() {
 
                         <DragOverlay>
                             {activeTask ? (
-                                <TaskCard {...activeTask} status={activeTask.status}/>
+                                <TaskCard
+                                    {...activeTask}
+                                    status={activeTask.status}
+                                />
                             ) : null}
                         </DragOverlay>
                     </DndContext>
                 </TabsContent>
 
                 {/* Table View */}
-                <TabsContent value="table" className="flex-1 overflow-auto p-6 m-0">
+                <TabsContent
+                    value="table"
+                    className="flex-1 overflow-auto p-6 m-0"
+                >
                     <TableView tasks={tasks}/>
                 </TabsContent>
 
                 {/* Gantt View */}
-                <TabsContent value="gantt" className="flex-1 overflow-auto p-6 m-0">
+                <TabsContent
+                    value="gantt"
+                    className="flex-1 overflow-auto p-6 m-0"
+                >
                     <GanttView tasks={tasks}/>
                 </TabsContent>
             </Tabs>

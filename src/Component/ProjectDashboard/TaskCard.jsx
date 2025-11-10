@@ -50,6 +50,11 @@ export function TaskCard(props) {
         comments,
         endDate,
         status = "",
+        // extra raw fields for modal
+        projectId,
+        assignedBy,
+        createdOn,
+        lastModified,
     } = props;
 
     const [open, setOpen] = useState(false);
@@ -183,13 +188,19 @@ export function TaskCard(props) {
             <TaskDetailsDialog
                 open={open}
                 onOpenChange={setOpen}
+                id={id}
+                projectId={projectId}
+                assignedBy={assignedBy}
+                createdOn={createdOn}
+                lastModified={lastModified}
                 title={title}
                 description={description}
                 status={status}
+                assigneeId={assigneeId}
                 safePriority={safePriority}
                 fullName={fullName}
                 initials={initials}
-                dueLabel={dueLabel}
+                endDate={endDate}
                 storyPoints={storyPoints}
                 comments={comments}
             />
