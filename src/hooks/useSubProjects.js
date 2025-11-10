@@ -1,4 +1,3 @@
-// src/hooks/useSubProjects.js
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {toast} from "sonner";
 import {http, getUserCtx} from "@/lib/http";
@@ -19,7 +18,7 @@ export function normalizeSubProject(row = {}) {
     };
 }
 
-// Optional: fetch all sub-projects if needed elsewhere
+// ---------- Fetch all sub-projects (optional global list) ----------
 export function useSubProjects() {
     const ctx = getUserCtx();
     const accessToken = ctx?.accessToken || "";
@@ -49,7 +48,7 @@ export function useSubProjects() {
     };
 }
 
-// Create Sub Project
+// ---------- Create Sub Project ----------
 export function useCreateSubProject() {
     const ctx = getUserCtx();
     const accessToken = ctx?.accessToken || "";
@@ -59,16 +58,6 @@ export function useCreateSubProject() {
         mutationFn: async (payload) => {
             if (!accessToken) throw new Error("No access token");
 
-            // Expecting:
-            // {
-            //   project_id,
-            //   subproject_name,
-            //   description,
-            //   project_status,
-            //   assigned_by,
-            //   assigned_to,
-            //   subproject_deadline
-            // }
             const res = await http.post("/sub-projects", payload, {
                 headers: {Authorization: `Bearer ${accessToken}`},
             });
@@ -92,6 +81,68 @@ export function useCreateSubProject() {
         },
         onError: (error) => {
             toast.error(errText(error) || "Failed to create sub project");
+        },
+    });
+}
+
+// ---------- Update Sub Project Status (Kanban drag & drop) ----------
+export function useUpdateSubProjectStatus() {
+    const ctx = getUserCtx();
+    const accessToken = ctx?.accessToken || "";
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        // expects: { id, project_status, projectId? }
+        mutationFn: async ({id, project_status}) => {
+            if (!accessToken) throw new Error("No access token");
+            if (!id) throw new Error("No sub-project id");
+            if (!project_status) throw new Error("No project_status");
+
+            // PUT {{test_server}}sub-projects/:id
+            // { "project_status": "Completed" }
+            const res = await http.put(
+                `/sub-projects/${id}`,
+                {project_status},
+                {headers: {Authorization: `Bearer ${accessToken}`}}
+            );
+
+            return res.data;
+        },
+
+        onSuccess: (data, variables) => {
+            const statusLabel =
+                variables?.project_status ||
+                data?.project_status ||
+                data?.status;
+
+            toast.success(
+                statusLabel
+                    ? `Sub project status updated to "${statusLabel}".`
+                    : "Sub project status updated."
+            );
+
+            // Refresh global sub-project list
+            queryClient.invalidateQueries(["sub-projects"]);
+
+            // Determine which project detail to refresh
+            const pid =
+                variables?.projectId ||
+                data?.project_id ||
+                data?.projectId ||
+                null;
+
+            if (pid) {
+                queryClient.invalidateQueries(["projects", pid]);
+            }
+
+            // Refresh projects overview
+            queryClient.invalidateQueries(["projects", "all"]);
+        },
+
+        onError: (error) => {
+            toast.error(
+                errText(error) || "Failed to update sub project status"
+            );
         },
     });
 }

@@ -43,7 +43,7 @@ function mapColumnToProjectStatus(columnId) {
         case "todo":
             return "To Do";
         case "in-progress":
-            return "Development"; // or "In Progress"
+            return "Development";
         case "done":
             return "Completed";
         default:
@@ -177,7 +177,6 @@ export default function Page() {
 
     // ---------- Build tasks whenever selectedProject changes ----------
     useEffect(() => {
-        // support various backend shapes: subprojects, sub_projects, etc.
         const rawSubprojects =
             selectedProject?.subprojects ||
             selectedProject?.sub_projects ||

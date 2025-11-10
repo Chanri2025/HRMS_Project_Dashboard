@@ -15,10 +15,10 @@ function computePriority(deadline) {
     const diffMs = dl.getTime() - now.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffDays <= 2) return "urgent";      // 0-2 days
-    if (diffDays <= 5) return "medium";      // 3-5 days
-    if (diffDays <= 10) return "important";  // 6-10 days
-    return "low";                            // >10 days
+    if (diffDays <= 2) return "urgent";
+    if (diffDays <= 5) return "medium";
+    if (diffDays <= 10) return "important";
+    return "low";
 }
 
 export function KanbanColumn({
