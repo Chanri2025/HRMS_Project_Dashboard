@@ -1,6 +1,11 @@
 import React, {useMemo} from "react";
 import {useNavigate} from "react-router-dom";
-import {Activity, TrendingUp, Users, Target} from "lucide-react";
+import {
+    FolderKanban,
+    ListChecks,
+    Users,
+    CheckCircle2,
+} from "lucide-react";
 
 import {MetricStatCard} from "./MetricStatCard";
 import {CurrentSprintCard} from "./CurrentSprintCard";
@@ -10,12 +15,25 @@ import {MetricStatCardSkeleton} from "@/Component/Dashboard/SkeletonLoading/Metr
 import {useDeptMembers} from "@/hooks/useDeptMembers";
 import {useActiveProjects} from "@/hooks/useActiveProjects";
 import {useSubProjects} from "@/hooks/useSubProjects";
+import {useScrums} from "@/hooks/useScrums";
+import {useMe} from "@/hooks/useMe";
 
 import {DashboardHeader} from "./DashboardHeader";
 import {AddScrumModal} from "@/Component/ProjectSection/Scrum/AddScrumModal";
 
+// date helpers you shared earlier
+import {
+    parseCreatedOn,
+    formatRange,
+    calcDaysRemaining,
+} from "@/Utils/ProjectHeader.helpers.js";
+
 const Page = () => {
     const navigate = useNavigate();
+
+    // ---------- Me ----------
+    const {data: me} = useMe(true);
+    const currentUserId = me?.user_id;
 
     // ---------- Dept members ----------
     const {
@@ -47,6 +65,131 @@ const Page = () => {
         error: subsErrorObj,
     } = useSubProjects();
 
+    // ---------- Build sprint info from sub-project statuses ----------
+    // ---------- Build sprint info from sub-project statuses ----------
+    const sprintInfo = useMemo(() => {
+        const list = Array.isArray(subProjects) ? subProjects : [];
+        if (list.length === 0) {
+            return {
+                status: "Planned",
+                dateRange: null,
+                remainingText: null,
+                progress: 0,
+                counts: {todo: 0, inProgress: 0, done: 0},
+            };
+        }
+
+        let todo = 0;
+        let inProgress = 0;
+        let done = 0;
+
+        // no TS annotations in .jsx
+        let startDate = null;
+        let endCandidate = null;
+
+        list.forEach((sp) => {
+            const raw =
+                (sp.status ||
+                    sp.project_status ||
+                    sp.projectStatus ||
+                    "") + "";
+            const s = raw.toLowerCase().trim();
+
+            // buckets
+            if (
+                s === "completed" ||
+                s === "done" ||
+                s === "deployment" ||
+                s === "deployed"
+            ) {
+                done += 1;
+            } else if (
+                s === "in progress" ||
+                s === "in-progress" ||
+                s === "development" ||
+                s === "active"
+            ) {
+                inProgress += 1;
+            } else {
+                // default to To Do / Backlog
+                todo += 1;
+            }
+
+            // dates
+            const created =
+                parseCreatedOn(
+                    sp.created_on ||
+                    sp.createdOn ||
+                    sp.createdAt
+                ) || null;
+
+            const deadline =
+                parseCreatedOn(
+                    sp.subproject_deadline || sp.deadline
+                ) || null;
+
+            const last =
+                parseCreatedOn(
+                    sp.last_modified ||
+                    sp.updatedAt
+                ) || null;
+
+            if (created) {
+                if (!startDate || created < startDate) {
+                    startDate = created;
+                }
+            }
+
+            // choose best end candidate: prefer deadline, fallback to last_modified
+            const candidate = deadline || last;
+            if (candidate) {
+                if (!endCandidate || candidate > endCandidate) {
+                    endCandidate = candidate;
+                }
+            }
+        });
+
+        const total = todo + inProgress + done;
+        const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+
+        // Derive sprint status (no union type)
+        let status = "Planned";
+        if (total === 0) {
+            status = "Planned";
+        } else if (progress === 100) {
+            status = "Completed";
+        } else {
+            status = "Active";
+        }
+
+        // Date range + remaining
+        const dateRange =
+            startDate && endCandidate
+                ? formatRange(startDate, endCandidate)
+                : null;
+
+        let remainingText = null;
+        if (endCandidate && status !== "Completed") {
+            const remaining = calcDaysRemaining(endCandidate);
+            if (remaining > 1) {
+                remainingText = `${remaining} days remaining`;
+            } else if (remaining === 1) {
+                remainingText = "1 day remaining";
+            } else {
+                remainingText = "Sprint end date reached";
+            }
+        }
+
+        return {
+            status,
+            dateRange,
+            remainingText,
+            progress,
+            counts: {todo, inProgress, done},
+        };
+    }, [subProjects]);
+
+
     const {
         totalSubProjects,
         completedSubProjectsCount,
@@ -76,22 +219,34 @@ const Page = () => {
         };
     }, [subProjects]);
 
+    // ---------- Scrums (for current user) ----------
+    const {
+        data: scrums = [],
+        isLoading: scrumsLoading,
+        isError: scrumsError,
+    } = useScrums();
+
+    const myScrumCount = useMemo(() => {
+        if (!Array.isArray(scrums) || !currentUserId) return 0;
+        return scrums.filter((s) => s.user_id === currentUserId).length;
+    }, [scrums, currentUserId]);
+
     // ---------- Metrics ----------
     const metrics = useMemo(
         () => [
             {
                 id: "activeProjects",
                 loading: projectsLoading,
-                icon: <Activity className="h-5 w-5 text-primary"/>,
-                iconWrapClass: "bg-primary/10",
+                icon: <FolderKanban className="h-5 w-5 text-sky-600"/>,
+                iconWrapClass: "bg-sky-100 rounded-full",
                 badgeText: projectsLoading
                     ? "Loading"
                     : projectsError
                         ? "Error"
                         : "Live",
                 badgeClass: projectsError
-                    ? "bg-destructive/10 text-destructive border-destructive/20"
-                    : "bg-primary/5 text-primary border-primary/20",
+                    ? "bg-rose-100 text-rose-600 border-rose-200"
+                    : "bg-sky-50 text-sky-700 border-sky-200",
                 value: projectsLoading
                     ? "—"
                     : projectsError
@@ -100,26 +255,39 @@ const Page = () => {
                 label: "Active Projects",
             },
             {
-                id: "storyPoints",
-                loading: false,
-                icon: <TrendingUp className="h-5 w-5 text-success"/>,
-                iconWrapClass: "bg-success/10",
-                badgeText: "+8%",
-                badgeClass: "bg-success/10 text-success border-success/20",
-                value: "89",
-                label: "Story Points",
+                id: "myScrums",
+                loading: scrumsLoading || !currentUserId,
+                icon: <ListChecks className="h-5 w-5 text-violet-600"/>,
+                iconWrapClass: "bg-violet-100 rounded-full",
+                badgeText: scrumsLoading
+                    ? "Loading"
+                    : scrumsError
+                        ? "Error"
+                        : "Total",
+                badgeClass: scrumsError
+                    ? "bg-rose-100 text-rose-600 border-rose-200"
+                    : "bg-violet-50 text-violet-700 border-violet-200",
+                value:
+                    scrumsLoading || !currentUserId
+                        ? "—"
+                        : scrumsError
+                            ? "0"
+                            : String(myScrumCount || 0),
+                label: "My Scrums",
             },
             {
                 id: "members",
                 loading: membersLoading,
-                icon: <Users className="h-5 w-5 text-info"/>,
-                iconWrapClass: "bg-info/10",
+                icon: <Users className="h-5 w-5 text-emerald-600"/>,
+                iconWrapClass: "bg-emerald-100 rounded-full",
                 badgeText: membersLoading
                     ? "Loading"
                     : membersError
                         ? "Error"
                         : "Active",
-                badgeClass: "bg-info/10 text-info border-info/20",
+                badgeClass: membersError
+                    ? "bg-rose-100 text-rose-600 border-rose-200"
+                    : "bg-emerald-50 text-emerald-700 border-emerald-200",
                 value: membersLoading
                     ? "—"
                     : membersError
@@ -130,16 +298,16 @@ const Page = () => {
             {
                 id: "completedSubProjects",
                 loading: subsLoading,
-                icon: <Target className="h-5 w-5 text-warning"/>,
-                iconWrapClass: "bg-warning/10",
+                icon: <CheckCircle2 className="h-5 w-5 text-amber-600"/>,
+                iconWrapClass: "bg-amber-100 rounded-full",
                 badgeText: subsLoading
                     ? "Loading"
                     : subsError
                         ? "Error"
                         : `${completionPercent}%`,
                 badgeClass: subsError
-                    ? "bg-destructive/10 text-destructive border-destructive/20"
-                    : "bg-warning/10 text-warning border-warning/20",
+                    ? "bg-rose-100 text-rose-600 border-rose-200"
+                    : "bg-amber-50 text-amber-700 border-amber-200",
                 value: subsLoading
                     ? "—"
                     : subsError
@@ -152,6 +320,10 @@ const Page = () => {
             activeCount,
             projectsLoading,
             projectsError,
+            scrumsLoading,
+            scrumsError,
+            myScrumCount,
+            currentUserId,
             memberCount,
             membersLoading,
             membersError,
@@ -162,6 +334,7 @@ const Page = () => {
             totalSubProjects,
         ]
     );
+
     return (
         <div className="min-h-screen p-6 space-y-6">
             <DashboardHeader
@@ -173,6 +346,7 @@ const Page = () => {
                 <AddScrumModal/>
             </DashboardHeader>
 
+            {/* Metric cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {metrics.map((m) =>
                     m.loading ? (
@@ -186,19 +360,31 @@ const Page = () => {
                             badgeClass={m.badgeClass}
                             value={m.value}
                             label={m.label}
+                            variant={
+                                m.id === "activeProjects"
+                                    ? "blue"
+                                    : m.id === "myScrums"
+                                        ? "violet"
+                                        : m.id === "members"
+                                            ? "green"
+                                            : m.id === "completedSubProjects"
+                                                ? "amber"
+                                                : "default"
+                            }
                         />
                     )
                 )}
             </div>
 
+            {/* Sprint + Team */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <CurrentSprintCard
                     className="lg:col-span-2"
-                    status="Active"
-                    dateRange="Dec 1 - Dec 14, 2024"
-                    remainingText="6 days remaining"
-                    progress={50}
-                    counts={{todo: 4, inProgress: 8, done: 12}}
+                    status={sprintInfo.status}
+                    dateRange={sprintInfo.dateRange}
+                    remainingText={sprintInfo.remainingText}
+                    progress={sprintInfo.progress}
+                    counts={sprintInfo.counts}
                     onOpenBoard={() => navigate("/board")}
                 />
 
@@ -209,22 +395,29 @@ const Page = () => {
                 />
             </div>
 
+            {/* Non-intrusive errors */}
             {membersError && (
                 <p className="text-xs text-destructive/80">
                     Failed to load team members
-                    {membersErrorObj?.message ? `: ${membersErrorObj.message}` : ""}.
+                    {membersErrorObj?.message
+                        ? `: ${membersErrorObj.message}`
+                        : ""}
                 </p>
             )}
             {projectsError && (
                 <p className="text-xs text-destructive/80">
                     Failed to load projects
-                    {projectsErrorObj?.message ? `: ${projectsErrorObj.message}` : ""}.
+                    {projectsErrorObj?.message
+                        ? `: ${projectsErrorObj.message}`
+                        : ""}
                 </p>
             )}
             {subsError && (
                 <p className="text-xs text-destructive/80">
                     Failed to load sub-projects
-                    {subsErrorObj?.message ? `: ${subsErrorObj.message}` : ""}.
+                    {subsErrorObj?.message
+                        ? `: ${subsErrorObj.message}`
+                        : ""}
                 </p>
             )}
         </div>

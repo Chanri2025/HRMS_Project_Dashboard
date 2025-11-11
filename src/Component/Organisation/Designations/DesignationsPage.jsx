@@ -152,35 +152,43 @@ export default function DesignationsPage() {
 
     /* -------------------------------- UI --------------------------------- */
     return (
-        <div className="p-4 md:p-6 max-w-7xl mx-auto">
-            <h2 className="text-2xl font-bold tracking-tight mb-1">Designations</h2>
-            <p className="text-muted-foreground mb-6">Create and manage designations.</p>
+        <div className="min-h-screen bg-slate-50/70 px-3 py-4 md:px-6 md:py-6">
+            <div className="max-w-7xl mx-auto mb-4">
+                <h2 className="text-3xl font-semibold tracking-tight text-slate-900">
+                    Designations
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">
+                    Create, map & organize designations across your organisation.
+                </p>
+            </div>
 
-            <DesignationSection
-                departments={departments}
-                subDepartments={subDepartmentsAll}          // pass ALL for name resolution
-                deptOptions={deptOptions}
-                subDeptOptions={subDeptOptions}
-                subDeptsForDesignation={subDeptsForDesignation}
-                designations={designations}
-                loadingDepts={loadingDepts}
-                loadingSubs={loadingSubs}
-                loadingDesignations={loadingDesignations}
-                deptFilter={deptFilter}
-                setDeptFilter={setDeptFilter}
-                subDeptFilter={subDeptFilter}
-                setSubDeptFilter={setSubDeptFilter}
-                designationForm={designationForm}
-                setDesignationForm={setDesignationForm}
-                onCreate={() => mCreateDesignation.mutate({...designationForm})}
-                onRefresh={() => qc.invalidateQueries({queryKey: qk.designationsAll})}
+            <div className="max-w-7xl mx-auto">
+                <DesignationSection
+                    departments={departments}
+                    subDepartments={subDepartmentsAll}          // pass ALL for name resolution
+                    deptOptions={deptOptions}
+                    subDeptOptions={subDeptOptions}
+                    subDeptsForDesignation={subDeptsForDesignation}
+                    designations={designations}
+                    loadingDepts={loadingDepts}
+                    loadingSubs={loadingSubs}
+                    loadingDesignations={loadingDesignations}
+                    deptFilter={deptFilter}
+                    setDeptFilter={setDeptFilter}
+                    subDeptFilter={subDeptFilter}
+                    setSubDeptFilter={setSubDeptFilter}
+                    designationForm={designationForm}
+                    setDesignationForm={setDesignationForm}
+                    onCreate={() => mCreateDesignation.mutate({...designationForm})}
+                    onRefresh={() => qc.invalidateQueries({queryKey: qk.designationsAll})}
 
-                // edit/delete wiring:
-                onUpdate={(vars) => mUpdateDesignation.mutate(vars)}
-                updating={mUpdateDesignation.isPending}
-                onDelete={(vars) => mDeleteDesignation.mutate(vars)}
-                deletingId={deletingId}
-            />
+                    // edit/delete wiring:
+                    onUpdate={(vars) => mUpdateDesignation.mutate(vars)}
+                    updating={mUpdateDesignation.isPending}
+                    onDelete={(vars) => mDeleteDesignation.mutate(vars)}
+                    deletingId={deletingId}
+                />
+            </div>
         </div>
     );
 }

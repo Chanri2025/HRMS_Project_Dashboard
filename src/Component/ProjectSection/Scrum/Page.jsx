@@ -94,7 +94,7 @@ const ScrumsPage = () => {
         },
         {
             key: "today_task",
-            header: "Today&apos;s Task",
+            header: "Today Task",
             render: (row) => (
                 <span className="whitespace-pre-wrap">
                     {row.today_task}

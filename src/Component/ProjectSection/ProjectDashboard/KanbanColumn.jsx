@@ -3,13 +3,24 @@ import {Card} from "@/components/ui/card.tsx";
 import {Badge} from "@/components/ui/badge.tsx";
 import {useDroppable} from "@dnd-kit/core";
 
-// ---------- Helper: compute priority from deadline ----------
-function computePriority(deadline) {
+// ---------- Helper: compute priority from deadline + status ----------
+function computePriority(deadline, status) {
+    const normalizedStatus = (status || "").toLowerCase().trim();
+
+    // ✅ If task is done/completed/deployed etc → never urgent
+    if (
+        normalizedStatus === "done" ||
+        normalizedStatus === "completed" ||
+        normalizedStatus === "deployment" ||
+        normalizedStatus === "deployed"
+    ) {
+        return "low";
+    }
+
     if (!deadline) return "low";
 
     const now = new Date();
     const dl = new Date(deadline);
-
     if (isNaN(dl.getTime())) return "low";
 
     const diffMs = dl.getTime() - now.getTime();
@@ -33,13 +44,14 @@ export function KanbanColumn({
     // Sort children by earliest deadline + inject priority
     const sortedChildren = React.Children.toArray(children)
         .map((child) => {
-            if (!React.isValidElement(child)) return {child, deadline: null};
+            if (!React.isValidElement(child)) return {child, deadline: null, status: null};
 
             const {
                 endDate,
                 deadline,
                 subproject_deadline,
                 subprojectDeadline,
+                status,
             } = child.props || {};
 
             const d =
@@ -49,16 +61,16 @@ export function KanbanColumn({
                 subprojectDeadline ||
                 null;
 
-            return {child, deadline: d};
+            return {child, deadline: d, status};
         })
         .sort((a, b) => {
             const da = a.deadline ? new Date(a.deadline).getTime() : Infinity;
             const db = b.deadline ? new Date(b.deadline).getTime() : Infinity;
             return da - db;
         })
-        .map(({child, deadline}) => {
+        .map(({child, deadline, status}) => {
             if (!React.isValidElement(child)) return child;
-            const priority = computePriority(deadline);
+            const priority = computePriority(deadline, status);
             return React.cloneElement(child, {priority});
         });
 

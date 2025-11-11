@@ -13,9 +13,9 @@ const qk = {
     subDeptsByDept: (dept_id) => ["org", "sub-departments", Number(dept_id)],
 };
 
-const fetchDepartments = async () => (await http.get("/org/departments")).data;
+const fetchDepartments = async () =>
+    (await http.get("/org/departments")).data;
 
-/** Use /org/sub-departments/:dept_id when filtering, else /org/sub-departments */
 const fetchSubDepartments = async (deptFilter) => {
     const url = deptFilter
         ? `/org/sub-departments/${Number(deptFilter)}`
@@ -33,17 +33,25 @@ export default function SubDepartmentsPage() {
         dept_id: "",
         sub_dept_name: "",
         description: "",
-        created_by: Number(userId) || 0, // ← from session_storage
+        created_by: Number(userId) || 0,
     });
 
-    const {data: departments = [], isLoading: loadingDepts} = useQuery({
+    const {
+        data: departments = [],
+        isLoading: loadingDepts,
+    } = useQuery({
         queryKey: qk.depts,
         queryFn: fetchDepartments,
         select: toArray,
     });
 
-    const {data: subDepartments = [], isLoading: loadingSubs} = useQuery({
-        queryKey: deptFilter ? qk.subDeptsByDept(deptFilter) : qk.subDeptsAll,
+    const {
+        data: subDepartments = [],
+        isLoading: loadingSubs,
+    } = useQuery({
+        queryKey: deptFilter
+            ? qk.subDeptsByDept(deptFilter)
+            : qk.subDeptsAll,
         queryFn: () => fetchSubDepartments(deptFilter),
         select: toArray,
     });
@@ -64,48 +72,68 @@ export default function SubDepartmentsPage() {
                 dept_id: Number(payload.dept_id),
                 created_by: Number(userId) || 0,
             };
-            return (await http.post("/org/sub-departments", body)).data;
+            return (
+                await http.post("/org/sub-departments", body)
+            ).data;
         },
         onSuccess: (data, payload) => {
-            toast.success(`Sub-Department “${data.sub_dept_name}” created`);
+            toast.success(
+                `Sub-Department “${data.sub_dept_name}” created`
+            );
             qc.invalidateQueries({queryKey: qk.subDeptsAll});
             if (payload.dept_id) {
                 qc.invalidateQueries({
                     queryKey: qk.subDeptsByDept(payload.dept_id),
                 });
             }
-            setSubDeptForm((s) => ({...s, sub_dept_name: "", description: ""}));
+            setSubDeptForm((s) => ({
+                ...s,
+                sub_dept_name: "",
+                description: "",
+            }));
         },
-        onError: (err) => toast.error(errText(err, "Failed to create sub-department")),
+        onError: (err) =>
+            toast.error(
+                errText(err, "Failed to create sub-department")
+            ),
     });
 
     return (
-        <div className="p-4 md:p-6 max-w-7xl mx-auto">
-            <div className="mb-6">
-                <h2 className="text-2xl font-bold tracking-tight">Sub-Departments</h2>
-                <p className="text-muted-foreground">
-                    Create and manage sub-departments under existing departments.
+        <div className="min-h-screen bg-slate-50/70 px-3 py-4 md:px-6 md:py-6">
+            <div className="max-w-7xl mx-auto mb-4">
+                <h2 className="text-3xl font-semibold tracking-tight text-slate-900">
+                    Sub-Departments
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">
+                    Create and manage sub-departments nested under your
+                    departments.
                 </p>
             </div>
 
-            <SubDepartmentSection
-                departments={departments}
-                deptOptions={deptOptions}
-                subDepartments={subDepartments}
-                loadingDepts={loadingDepts}
-                loadingSubs={loadingSubs}
-                deptFilter={deptFilter}
-                setDeptFilter={setDeptFilter}
-                subDeptForm={subDeptForm}
-                setSubDeptForm={setSubDeptForm}
-                onCreate={() => mCreateSubDept.mutate({...subDeptForm})}
-                onRefresh={() =>
-                    qc.invalidateQueries({
-                        queryKey: deptFilter ? qk.subDeptsByDept(deptFilter) : qk.subDeptsAll,
-                    })
-                }
-                creating={mCreateSubDept.isPending}
-            />
+            <div className="max-w-7xl mx-auto">
+                <SubDepartmentSection
+                    departments={departments}
+                    deptOptions={deptOptions}
+                    subDepartments={subDepartments}
+                    loadingDepts={loadingDepts}
+                    loadingSubs={loadingSubs}
+                    deptFilter={deptFilter}
+                    setDeptFilter={setDeptFilter}
+                    subDeptForm={subDeptForm}
+                    setSubDeptForm={setSubDeptForm}
+                    onCreate={() =>
+                        mCreateSubDept.mutate({...subDeptForm})
+                    }
+                    onRefresh={() =>
+                        qc.invalidateQueries({
+                            queryKey: deptFilter
+                                ? qk.subDeptsByDept(deptFilter)
+                                : qk.subDeptsAll,
+                        })
+                    }
+                    creating={mCreateSubDept.isPending}
+                />
+            </div>
         </div>
     );
 }
