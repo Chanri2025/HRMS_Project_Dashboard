@@ -8,7 +8,11 @@ import {ProjectSidebar} from "@/Utils/ProjectSidebar.jsx";
 import HeaderBar from "@/Utils/HeaderBar.jsx";
 
 import Page from "@/Component/Dashboard/Page.jsx";
-import ProjectDashboardPage from "@/Component/ProjectDashboard/Page.jsx";
+
+import ProjectDashboardPage from "@/Component/ProjectSection/ProjectDashboard/Page.jsx";
+import ProjectAdd from "@/Component/ProjectSection/ProjectAdd/Page.jsx";
+import ScrumPage from "@/Component/ProjectSection/Scrum/Page.jsx"
+
 import Calendar from "@/Component/Calendar.jsx";
 import Attendance from "@/Component/Attendance.jsx";
 import NotFound from "@/Utils/NotFound.jsx";
@@ -23,6 +27,8 @@ import QuickAddPage from "@/Component/Organisation/QuickAdd/QuickAddPage.jsx";
 
 import EmployeeDashboard from "@/Component/Employee Section/Dashboard/Page.jsx";
 import AddUserForm from "@/Component/Employee Section/Employee/AddUserForm.jsx";
+
+import TeamPerformance from "@/Component/Reports/TeamPerformance/Page.jsx";
 
 import AppBreadcrumbs from "@/Utils/AppBreadcrumbs.jsx";
 import {useEffect, useMemo, useState} from "react";
@@ -129,6 +135,9 @@ function App() {
                             <Route path="/attendance" element={<Attendance/>}/>
 
                             <Route path="/project" element={<ProjectDashboardPage/>}/>
+                            <Route path="/project/add" element={<ProjectAdd/>}/>
+                            <Route path="/project/scrum" element={<ScrumPage/>}/>
+
 
                             <Route path="/team" element={<Org/>}/>
                             <Route path="/team/departments" element={<DepartmentsPage/>}/>
@@ -138,6 +147,8 @@ function App() {
 
                             <Route path="/employees-section/dashboard" element={<EmployeeDashboard/>}/>
                             <Route path="/employees-section/add" element={<AddUserForm/>}/>
+
+                            <Route path="/reports" element={<TeamPerformance/>}/>
 
                             <Route path="*" element={<NotFound/>}/>
                         </Routes>

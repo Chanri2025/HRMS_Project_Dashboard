@@ -23,6 +23,7 @@ export const MENU = [
         children: [
             {title: "Project Dashboard", url: "/project"},
             {title: "Create Project", url: "/project/add"},
+            {title: "Scrum Dashboard", url: "/project/scrum"},
         ],
     },
     {
@@ -30,9 +31,9 @@ export const MENU = [
         url: "/reports",
         icon: BarChart3,
         children: [
-            {title: "Overview", url: "/reports/overview"},
-            {title: "Sales", url: "/reports/sales"},
-            {title: "Team Performance", url: "/reports/team-performance"},
+            {title: "Overview", url: "/reports"},
+            {title: "Sales", url: "/reports"},
+            {title: "Team Performance", url: "/reports"},
         ],
     },
     {

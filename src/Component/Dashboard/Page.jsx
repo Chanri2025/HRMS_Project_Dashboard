@@ -1,17 +1,18 @@
-// src/pages/Page.jsx (Dashboard)
 import React, {useMemo} from "react";
 import {useNavigate} from "react-router-dom";
 import {Activity, TrendingUp, Users, Target} from "lucide-react";
 
-import {DashboardHeader} from "./DashboardHeader";
 import {MetricStatCard} from "./MetricStatCard";
 import {CurrentSprintCard} from "./CurrentSprintCard";
 import {TeamMembersCard} from "./TeamMembersCard";
+import {MetricStatCardSkeleton} from "@/Component/Dashboard/SkeletonLoading/MetricStatCardSkeleton";
 
 import {useDeptMembers} from "@/hooks/useDeptMembers";
 import {useActiveProjects} from "@/hooks/useActiveProjects";
 import {useSubProjects} from "@/hooks/useSubProjects";
-import {MetricStatCardSkeleton} from "@/Component/Dashboard/SkeletonLoading/MetricStatCardSkeleton";
+
+import {DashboardHeader} from "./DashboardHeader";
+import {AddScrumModal} from "@/Component/ProjectSection/Scrum/AddScrumModal";
 
 const Page = () => {
     const navigate = useNavigate();
@@ -38,7 +39,7 @@ const Page = () => {
         error: projectsErrorObj,
     } = useActiveProjects();
 
-    // ---------- Sub-projects (for completed stats) ----------
+    // ---------- Sub-projects ----------
     const {
         subProjects,
         isLoading: subsLoading,
@@ -52,17 +53,13 @@ const Page = () => {
         completionPercent,
     } = useMemo(() => {
         const list = Array.isArray(subProjects) ? subProjects : [];
-
         const total = list.length;
-
         const completed = list.filter((sp) => {
-            // support both normalized + raw just in case
             const raw =
                 (sp.status ||
                     sp.project_status ||
                     sp.projectStatus ||
-                    "") +
-                "";
+                    "") + "";
             const s = raw.toLowerCase().trim();
             return (
                 s === "completed" ||
@@ -71,9 +68,7 @@ const Page = () => {
                 s === "deployed"
             );
         }).length;
-
         const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-
         return {
             totalSubProjects: total,
             completedSubProjectsCount: completed,
@@ -81,7 +76,7 @@ const Page = () => {
         };
     }, [subProjects]);
 
-    // ---------- Metric cards ----------
+    // ---------- Metrics ----------
     const metrics = useMemo(
         () => [
             {
@@ -167,17 +162,17 @@ const Page = () => {
             totalSubProjects,
         ]
     );
-
     return (
         <div className="min-h-screen p-6 space-y-6">
             <DashboardHeader
                 title="Dashboard"
                 subtitle="Welcome back! Here's your sprint overview"
-                ctaLabel="View Page"
+                ctaLabel="View Projects Page"
                 onCta={() => navigate("/board")}
-            />
+            >
+                <AddScrumModal/>
+            </DashboardHeader>
 
-            {/* Metrics with per-card skeletons */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {metrics.map((m) =>
                     m.loading ? (
@@ -196,7 +191,6 @@ const Page = () => {
                 )}
             </div>
 
-            {/* Sprint + Team */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <CurrentSprintCard
                     className="lg:col-span-2"
@@ -215,21 +209,18 @@ const Page = () => {
                 />
             </div>
 
-            {/* Non-intrusive errors */}
             {membersError && (
                 <p className="text-xs text-destructive/80">
                     Failed to load team members
                     {membersErrorObj?.message ? `: ${membersErrorObj.message}` : ""}.
                 </p>
             )}
-
             {projectsError && (
                 <p className="text-xs text-destructive/80">
                     Failed to load projects
                     {projectsErrorObj?.message ? `: ${projectsErrorObj.message}` : ""}.
                 </p>
             )}
-
             {subsError && (
                 <p className="text-xs text-destructive/80">
                     Failed to load sub-projects
