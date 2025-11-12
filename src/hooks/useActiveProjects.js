@@ -330,3 +330,29 @@ export function useCreateSubProject() {
         },
     });
 }
+
+// --- Create Project: POST /projects
+export function useCreateProject() {
+  const ctx = getUserCtx();
+  const accessToken = ctx?.accessToken || "";
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload) => {
+      if (!accessToken) throw new Error("No access token");
+      const res = await http.post("/projects", payload, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success("Project created successfully");
+      // refresh lists
+      queryClient.invalidateQueries(["projects", "all"]);
+    },
+    onError: (error) => {
+      toast.error(errText(error) || "Failed to create project");
+    },
+  });
+}
+
