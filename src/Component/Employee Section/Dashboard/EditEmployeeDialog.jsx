@@ -169,7 +169,9 @@ export default function EditEmployeeDialog({
     const editUser = useEditUser({
         onSuccess: () => {
             toast.success("Employee updated", {
-                description: `${form.emp_full_name || form.full_name || "Employee"} was saved successfully.`,
+                description: `${
+                    form.emp_full_name || form.full_name || "Employee"
+                } was saved successfully.`,
             });
             onSaved?.();
         },
@@ -181,31 +183,35 @@ export default function EditEmployeeDialog({
     });
 
     const save = () => {
+        // Build namespaced patches to avoid duplicate keys like `full_name`
+        const userPatch = {
+            email: form.email || undefined,
+            full_name: form.full_name || undefined,
+            is_active: Boolean(form.is_active),
+            role: form.role || undefined,
+        };
+
+        const employeePatch = {
+            employee_id: form.employee_id || undefined,
+            full_name: form.emp_full_name || undefined, // employee.full_name
+            phone: form.phone || undefined,
+            address: form.address || undefined,
+            fathers_name: form.fathers_name || undefined,
+            aadhar_no: form.aadhar_no || undefined,
+            date_of_birth: form.date_of_birth || undefined, // YYYY-MM-DD
+            work_position: form.work_position || form.role || undefined,
+            card_id: form.card_id || undefined,
+            dept_id: form.dept_id || null,
+            sub_dept_id: form.sub_dept_id || null,
+            designation_id: form.designation_id || null,
+        };
+
         editUser.mutate({
             userId: u.user_id,
             patch: {
-                // user-level
-                email: form.email || undefined,
-                full_name: form.full_name || undefined,
-                is_active: Boolean(form.is_active),
-                role: form.role || undefined,
-
-                // employee-level
-                employee_id: form.employee_id || undefined,
-                full_name: form.emp_full_name || undefined, // employee.full_name
-                phone: form.phone || undefined,
-                address: form.address || undefined,
-                fathers_name: form.fathers_name || undefined,
-                aadhar_no: form.aadhar_no || undefined,
-                date_of_birth: form.date_of_birth || undefined, // YYYY-MM-DD
-                work_position: form.work_position || form.role || undefined,
-                card_id: form.card_id || undefined,
-                dept_id: form.dept_id || null,
-                sub_dept_id: form.sub_dept_id || null,
-                designation_id: form.designation_id || null,
-
-                // auditing
-                updated_by: me?.userId ?? null, // 👈 add signed-in user_id
+                user: userPatch,
+                employee: employeePatch,
+                updated_by: me?.userId ?? null,
             },
         });
     };
