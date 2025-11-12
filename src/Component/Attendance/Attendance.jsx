@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Calendar } from "@/components/ui/calendar";
+import { Card } from "@/components/ui/card.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar.tsx";
+import { Calendar } from "@/components/ui/calendar.tsx";
 import {
   Table,
   TableBody,
@@ -10,7 +10,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table.tsx";
 import { format } from "date-fns";
 
 const mockAttendance = [

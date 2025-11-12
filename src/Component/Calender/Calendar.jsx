@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar.tsx";
+import { Card } from "@/components/ui/card.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
 import { format } from "date-fns";
 
 const mockEvents = [

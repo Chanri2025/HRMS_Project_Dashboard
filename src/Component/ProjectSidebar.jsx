@@ -11,26 +11,37 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@/components/ui/sidebar.tsx";
 import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from "@/components/ui/collapsible.tsx";
 
-import {MENU, parentIsActive} from "@/Utils/navigation";
+import {
+    MENU,
+    parentIsActive,
+    filterMenuByRole,
+    getCurrentRole,
+    buildLabelMap, // if you need role-aware breadcrumbs
+} from "@/Utils/navigation.js"; // <- corrected path
 
 export function ProjectSidebar() {
     const {pathname} = useLocation();
+    const role = getCurrentRole(); // from sessionStorage
+
+    const filtered = useMemo(() => filterMenuByRole(MENU, role), [role]);
 
     const items = useMemo(
         () =>
-            MENU.map((item) => ({
+            filtered.map((item) => ({
                 ...item,
                 isActive: parentIsActive(pathname, item.url, item.children),
             })),
-        [pathname]
+        [pathname, filtered]
     );
+
+    // const labelMap = useMemo(() => buildLabelMap(filtered), [filtered]); // if needed elsewhere
 
     return (
         <Sidebar>
@@ -74,7 +85,10 @@ export function ProjectSidebar() {
 
                                 return (
                                     <SidebarMenuItem key={item.title}>
-                                        <Collapsible defaultOpen={item.isActive} className="group/coll">
+                                        <Collapsible
+                                            defaultOpen={Boolean(item.isActive)}
+                                            className="group/coll"
+                                        >
                                             <CollapsibleTrigger asChild>
                                                 <SidebarMenuButton
                                                     className={[
@@ -108,7 +122,7 @@ export function ProjectSidebar() {
                                                 ].join(" ")}
                                             >
                                                 <div className="mt-1 flex flex-col gap-1">
-                                                    {item.children.map((child) => (
+                                                    {(item.children || []).map((child) => (
                                                         <NavLink
                                                             key={child.title}
                                                             to={child.url}

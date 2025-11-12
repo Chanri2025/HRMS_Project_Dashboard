@@ -4,8 +4,8 @@ import {
     useProjectById,
     useProjectMembers,
     useDeleteProject,
+    useUserById, // 👈 import
 } from "@/hooks/useActiveProjects.js";
-import {useUserLabel} from "@/hooks/useOrgLookups.js";
 import ConfirmDialog from "@/Utils/ConfirmDialog.jsx";
 
 import {Card, CardHeader, CardTitle, CardContent} from "@/components/ui/card";
@@ -76,13 +76,30 @@ function StatCard({icon: Icon, label, value, hint, accent = ""}) {
 /* ----------------------- Quick View Modal (inline) ------------------------ */
 
 function MemberRow({m}) {
+    const userId = m.userId ?? m.id ?? null;
+    const {data: user, isLoading} = useUserById(userId);
+
+    const fullName =
+        user?.employee?.full_name ||
+        user?.full_name ||
+        user?.name ||
+        m.fullName ||
+        m.email ||
+        "Member";
+
+    const email =
+        user?.employee?.email ||
+        user?.email ||
+        m.email ||
+        "";
+
     const initials = React.useMemo(() => {
-        const name = m.fullName || m.email || "User";
-        const parts = name.trim().split(" ");
+        const base = fullName || email || "U";
+        const parts = String(base).trim().split(/\s+/);
         const a = (parts[0]?.[0] || "").toUpperCase();
         const b = (parts[1]?.[0] || "").toUpperCase();
         return (a + b) || "U";
-    }, [m]);
+    }, [fullName, email]);
 
     return (
         <div className="flex items-center justify-between py-2">
@@ -91,8 +108,12 @@ function MemberRow({m}) {
                     <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
                 <div className="leading-tight">
-                    <div className="text-sm font-medium">{m.fullName || "Member"}</div>
-                    {m.email ? <div className="text-[11px] text-muted-foreground">{m.email}</div> : null}
+                    <div className="text-sm font-medium">
+                        {isLoading ? "Loading…" : fullName}
+                    </div>
+                    {email ? (
+                        <div className="text-[11px] text-muted-foreground">{email}</div>
+                    ) : null}
                 </div>
             </div>
         </div>
@@ -103,26 +124,21 @@ function ProjectQuickViewDialog({
                                     open,
                                     onOpenChange,
                                     projectId,
-                                    onEditClick,          // optional callback to open your edit modal
-                                    onCreateSubproject,   // optional callback to open subproject modal
+                                    onEditClick,
+                                    onCreateSubproject,
                                 }) {
     const {data: project, isLoading, isError} = useProjectById(open ? projectId : null);
     const {data: members = [], isLoading: membersLoading} = useProjectMembers(open ? projectId : null);
 
-    // Resolve "Created By" user label (like your edit modal logic)
-    const createdById = project?.createdById ?? null;
-    const {name: createdByName, label: createdByLabel} = useUserLabel(createdById);
-
-    // Delete project logic with confirm dialog
+    // Delete logic for inline quick-view
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
     const deleteProject = useDeleteProject();
-
     const handleDelete = async () => {
         if (!projectId) return;
         await deleteProject.mutateAsync(projectId, {
             onSuccess: () => {
                 setConfirmDeleteOpen(false);
-                onOpenChange(false); // close quick-view after delete
+                onOpenChange(false);
             },
         });
     };
@@ -144,7 +160,6 @@ function ProjectQuickViewDialog({
                     <div className="flex items-center justify-between">
                         <StatusBadge status={project?.status}/>
                         <div className="flex items-center gap-2">
-                            {/* Delete button (destructive) */}
                             <Button
                                 size="sm"
                                 variant="destructive"
@@ -155,7 +170,6 @@ function ProjectQuickViewDialog({
                                 {deleteProject.isLoading ? "Deleting..." : "Delete"}
                             </Button>
 
-                            {/* Create Sub Project */}
                             {onCreateSubproject && (
                                 <Button size="sm" onClick={() => onCreateSubproject(projectId)}>
                                     <ListChecks className="h-4 w-4 mr-1"/>
@@ -163,7 +177,6 @@ function ProjectQuickViewDialog({
                                 </Button>
                             )}
 
-                            {/* Edit */}
                             {onEditClick && (
                                 <Button size="sm" variant="secondary" onClick={() => onEditClick(project)}>
                                     <Edit3 className="h-4 w-4 mr-1"/>
@@ -245,10 +258,7 @@ function ProjectQuickViewDialog({
                                 <Card className="bg-card/70 border-border/60 rounded-xl">
                                     <CardContent className="p-4">
                                         <div className="text-xs text-muted-foreground">Created By</div>
-                                        <div className="text-sm">
-                                            {/* Show the resolved user name like your edit modal */}
-                                            {createdByName || createdByLabel || (createdById ? `User #${createdById}` : "—")}
-                                        </div>
+                                        <div className="text-sm">{project?.createdById ?? "—"}</div>
                                     </CardContent>
                                 </Card>
                             </div>
@@ -257,14 +267,11 @@ function ProjectQuickViewDialog({
                 </DialogContent>
             </Dialog>
 
-            {/* Confirm Delete */}
             <ConfirmDialog
                 open={confirmDeleteOpen}
                 onOpenChange={setConfirmDeleteOpen}
                 title="Delete this project?"
-                description={`"${
-                    project?.name || "Project"
-                }" will be permanently removed. This cannot be undone.`}
+                description={`"${project?.name || "Project"}" will be permanently removed. This cannot be undone.`}
                 confirmText={deleteProject.isLoading ? "Deleting..." : "Delete"}
                 cancelText="Cancel"
                 variant="destructive"
@@ -345,15 +352,13 @@ export default function ProjectsPage() {
 
     // Optional callbacks to hook into your existing edit/subproject modals elsewhere.
     const handleEditFromQuickView = () => {
-        // Example: close quick view and open your edit dialog (if you have it on this page).
         // setPreviewOpen(false);
-        // setEditOpen(true);
+        // open your edit modal here
     };
 
     const handleSubprojectFromQuickView = () => {
-        // Example: close quick view and open your create subproject dialog.
         // setPreviewOpen(false);
-        // setSubprojectOpen(true);
+        // open your subproject modal here
     };
 
     return (

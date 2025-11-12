@@ -1,4 +1,5 @@
 import React, {useState, useMemo, useEffect} from "react";
+import {useParams, useNavigate, useSearchParams} from "react-router-dom";
 
 import {ProjectHeader} from "@/Component/ProjectSection/ProjectDashboard/ProjectHeader/ProjectHeader.jsx";
 import {KanbanColumn} from "@/Component/ProjectSection/ProjectDashboard/KanbanColumn.jsx";
@@ -32,10 +33,11 @@ import {
     useProjectMembers,
 } from "@/hooks/useActiveProjects.js";
 
-import {SubProjectCreateDialog} from "@/Component/ProjectSection/ProjectDashboard/ProjectHeader/SubProjectCreateDialog.jsx";
 import {
-    useUpdateSubProjectStatus,
-} from "@/hooks/useSubProjects.js";
+    SubProjectCreateDialog
+} from "@/Component/ProjectSection/ProjectDashboard/ProjectHeader/SubProjectCreateDialog.jsx";
+import {useUpdateSubProjectStatus} from "@/hooks/useSubProjects.js";
+import {useProjectSelection} from "@/hooks/useProjectSelection.js";
 
 // ---------- Map column id -> API project_status ----------
 function mapColumnToProjectStatus(columnId) {
@@ -152,9 +154,19 @@ function mapSubprojectsToTasks(subprojects = []) {
 }
 
 export default function Page() {
+    const {projectId: routeProjectId} = useParams();
+    const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    const {projectId, setProjectId} = useProjectSelection();
+
+    // Sync shared selection when route param changes
+    useEffect(() => {
+        if (routeProjectId) setProjectId(routeProjectId);
+    }, [routeProjectId, setProjectId]);
+
     const [tasks, setTasks] = useState([]);
     const [activeId, setActiveId] = useState(null);
-    const [selectedProjectId, setSelectedProjectId] = useState(null);
     const [createOpen, setCreateOpen] = useState(false);
 
     const {
@@ -164,22 +176,24 @@ export default function Page() {
         isError: projectsError,
     } = useActiveProjects();
 
-    // Select first active project by default
+    // If user hits /project/:projectId that doesn't exist, fallback after load
     useEffect(() => {
-        if (!projectsLoading && !projectsError && activeProjects?.length > 0) {
-            setSelectedProjectId((prev) => prev ?? activeProjects[0].id);
+        if (projectsLoading) return;
+        if (!activeProjects?.length) return;
+        const exists = activeProjects.some(p => String(p.id) === String(routeProjectId));
+        if (!exists) {
+            navigate(`/project/${activeProjects[0].id}`, {replace: true});
         }
-    }, [projectsLoading, projectsError, activeProjects]);
+    }, [projectsLoading, activeProjects, routeProjectId, navigate]);
 
     const {
         data: detailedProject,
         isLoading: projectDetailLoading,
         isError: projectDetailError,
-    } = useProjectById(selectedProjectId);
+    } = useProjectById(routeProjectId || projectId);
 
     const baseSelectedProject =
-        activeProjects?.find((p) => p.id === selectedProjectId) ||
-        activeProjects?.[0] ||
+        activeProjects?.find((p) => String(p.id) === String(routeProjectId || projectId)) ||
         null;
 
     const selectedProject = detailedProject || baseSelectedProject || null;
@@ -195,7 +209,7 @@ export default function Page() {
         selectedProject?.members ||
         [];
 
-    // ---------- Build tasks whenever selectedProject changes ----------
+    // Build tasks whenever selectedProject changes
     useEffect(() => {
         const rawSubprojects =
             selectedProject?.subprojects ||
@@ -211,7 +225,7 @@ export default function Page() {
         }
     }, [selectedProject]);
 
-    // ---------- DnD ----------
+    // DnD
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {distance: 8},
@@ -284,6 +298,16 @@ export default function Page() {
     const headerLoading = projectsLoading || projectDetailLoading;
     const headerError = projectsError || projectDetailError;
 
+    // When user changes project from header dropdown, push canonical URL
+    const handleSelectProject = (id) => {
+        setProjectId(id);
+        navigate(`/project/${id}`);
+    };
+
+    // Persist active tab in query param (?view=kanban|table|gantt)
+    const view = searchParams.get("view") || "kanban";
+    const setView = (v) => setSearchParams({view: v});
+
     return (
         <div className="flex flex-col h-screen">
             <ProjectHeader
@@ -292,7 +316,7 @@ export default function Page() {
                 projects={activeProjects}
                 activeCount={activeCount}
                 selectedProject={selectedProject}
-                onSelectProject={setSelectedProjectId}
+                onSelectProject={handleSelectProject}
                 tasks={tasks}
                 onCreateSubProject={() => setCreateOpen(true)}
             />
@@ -304,7 +328,7 @@ export default function Page() {
                 projectMembers={projectMembers}
             />
 
-            <Tabs defaultValue="kanban" className="flex-1 flex flex-col">
+            <Tabs value={view} onValueChange={setView} className="flex-1 flex flex-col">
                 <div className="border-b px-6 py-2">
                     <TabsList>
                         <TabsTrigger value="kanban">Kanban</TabsTrigger>

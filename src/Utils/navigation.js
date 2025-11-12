@@ -7,62 +7,196 @@ import {
     Calendar,
     BarChart3,
     UserCog,
-    Target
+    Target,
 } from "lucide-react";
 
-/** Single source of truth for app navigation */
+/** Role constants */
+export const ALL_ROLES = [
+    "SUPER-ADMIN",
+    "ADMIN",
+    "MANAGER",
+    "EMPLOYEE",
+    "USER",
+];
+
+/** Get current role from sessionStorage (fallback to USER) */
+export function getCurrentRole() {
+    try {
+        const raw = sessionStorage.getItem("userData");
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            const role = String(parsed?.role || "USER").toUpperCase();
+            if (ALL_ROLES.includes(role)) return role;
+        }
+    } catch {
+    }
+    return "USER";
+}
+
+/** Guard */
+function isAllowed(allowedRoles, role) {
+    const list =
+        Array.isArray(allowedRoles) && allowedRoles.length
+            ? allowedRoles
+            : ALL_ROLES;
+    return list.includes(role);
+}
+
+/** Single source of truth for app navigation (role-aware via allowedRoles) */
 export const MENU = [
-    {title: "Dashboard", url: "/", icon: LayoutDashboard},
-    {title: "Project Page", url: "/board", icon: KanbanSquare},
-    {title: "Calendar", url: "/calendar", icon: Calendar},
-    {title: "Attendance", url: "/attendance", icon: Users},
+    {
+        title: "Dashboard",
+        url: "/",
+        icon: LayoutDashboard,
+        allowedRoles: ALL_ROLES, // everyone
+    },
+    {
+        title: "Project Page",
+        url: "/board",
+        icon: KanbanSquare,
+        allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER", "EMPLOYEE"],
+    },
+    {
+        title: "Calendar",
+        url: "/calendar",
+        icon: Calendar,
+        allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER"],
+    },
+    {
+        title: "Attendance",
+        url: "/attendance",
+        icon: Users,
+        allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER"],
+    },
     {
         title: "Project Section",
         url: "/project",
         icon: Target,
+        allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER", "EMPLOYEE"],
         children: [
-            {title: "Project Dashboard", url: "/project"},
-            {title: "Create Project", url: "/project/add"},
-            {title: "Scrum Dashboard", url: "/project/scrum"},
+            {
+                title: "Project Dashboard",
+                url: "/project",
+                allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER", "EMPLOYEE"],
+            },
+            {
+                title: "Create Project",
+                url: "/project/add",
+                allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER", "EMPLOYEE"],
+            },
+            {
+                title: "Scrum Dashboard",
+                url: "/project/scrum",
+                allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER", "EMPLOYEE"],
+            },
         ],
     },
     {
         title: "Reports",
         url: "/reports",
         icon: BarChart3,
+        allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER"],
         children: [
-            {title: "Overview", url: "/reports"},
-            {title: "Sales", url: "/reports"},
-            {title: "Team Performance", url: "/reports"},
+            {
+                title: "Overview",
+                url: "/reports",
+                allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER"],
+            },
+            {
+                title: "Sales",
+                url: "/reports",
+                allowedRoles: ["SUPER-ADMIN", "ADMIN"],
+            },
+            {
+                title: "Team Performance",
+                url: "/reports",
+                allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER"],
+            },
         ],
     },
     {
         title: "Organisation",
         url: "/team",
         icon: Users,
+        allowedRoles: ["SUPER-ADMIN", "ADMIN"],
         children: [
-            {title: "Organisation Dashboard", url: "/team"},
-            {title: "Organisation Tree", url: "/team/org"},
-            {title: "Departments", url: "/team/departments"},
-            {title: "Sub - Departments", url: "/team/org/sub-departments"},
-            {title: "Designations", url: "/team/org/designations"},
-            {title: "Quick Add", url: "/team/org/quick-add"},
+            {
+                title: "Organisation Dashboard",
+                url: "/team",
+                allowedRoles: ["SUPER-ADMIN", "ADMIN"],
+            },
+            {
+                title: "Organisation Tree",
+                url: "/team/org",
+                allowedRoles: ["SUPER-ADMIN", "ADMIN"],
+            },
+            {
+                title: "Departments",
+                url: "/team/departments",
+                allowedRoles: ["SUPER-ADMIN", "ADMIN"],
+            },
+            {
+                title: "Sub - Departments",
+                url: "/team/org/sub-departments",
+                allowedRoles: ["SUPER-ADMIN", "ADMIN"],
+            },
+            {
+                title: "Designations",
+                url: "/team/org/designations",
+                allowedRoles: ["SUPER-ADMIN", "ADMIN"],
+            },
+            {
+                title: "Quick Add",
+                url: "/team/org/quick-add",
+                allowedRoles: ["SUPER-ADMIN", "ADMIN"],
+            },
         ],
     },
     {
         title: "Employees Section",
         url: "/employees-section",
         icon: UserCog,
+        allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER"],
         children: [
-            {title: "Employees Dashboard", url: "/employees-section/dashboard"},
-            {title: "Add Employees", url: "/employees-section/add"},
+            {
+                title: "Employees Dashboard",
+                url: "/employees-section/dashboard",
+                allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER"],
+            },
+            {
+                title: "Add Employees",
+                url: "/employees-section/add",
+                allowedRoles: ["SUPER-ADMIN", "ADMIN"],
+            },
         ],
     },
-
-    {title: "Settings", url: "/settings", icon: Settings},
+    {
+        title: "Settings",
+        url: "/settings",
+        icon: Settings,
+        allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER"],
+    },
 ];
 
-/** Flatten MENU into a { path: label } map */
+/** Filter the MENU based on role (also filters children) */
+export function filterMenuByRole(menu, role) {
+    return (menu || []).reduce((acc, item) => {
+        if (!isAllowed(item.allowedRoles, role)) return acc;
+
+        let children; // keep undefined unless there are visible children
+        if (Array.isArray(item.children) && item.children.length) {
+            const filteredKids = item.children.filter((c) =>
+                isAllowed(c.allowedRoles, role)
+            );
+            if (filteredKids.length) children = filteredKids;
+        }
+
+        acc.push({...item, children});
+        return acc;
+    }, []);
+}
+
+/** Flatten MENU into a { path: label } map (pass filtered menu for visible-only labels) */
 export function buildLabelMap(menu = MENU) {
     const map = {};
     const visit = (items) => {
@@ -72,7 +206,6 @@ export function buildLabelMap(menu = MENU) {
         });
     };
     visit(menu);
-    // Make sure root is named
     if (!map["/"]) map["/"] = "Dashboard";
     return map;
 }
@@ -81,10 +214,7 @@ export function buildLabelMap(menu = MENU) {
 function prettify(seg) {
     try {
         const s = decodeURIComponent(seg);
-        // Turn "sub-departments" -> "Sub Departments"
-        return s
-            .replace(/[-_]+/g, " ")
-            .replace(/\b\w/g, (m) => m.toUpperCase());
+        return s.replace(/[-_]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
     } catch {
         return seg;
     }
@@ -105,11 +235,17 @@ export function getBreadcrumbs(pathname, labelMap) {
     return [{path: "/", label: labelMap["/"] || "Dashboard"}, ...acc];
 }
 
-/** Determine if a parent item should appear active for a pathname */
-export function parentIsActive(pathname, parentUrl, children = []) {
+/** Determine if a parent item should appear active for a pathname (null-safe) */
+export function parentIsActive(pathname, parentUrl = "", children) {
+    const kids = Array.isArray(children) ? children : [];
+    if (!parentUrl) return false;
+
     if (pathname === parentUrl) return true;
     if (pathname.startsWith(parentUrl + "/")) return true;
-    return children.some(
-        (c) => pathname === c.url || pathname.startsWith(c.url + "/")
+
+    return kids.some(
+        (c) =>
+            (c?.url && pathname === c.url) ||
+            (c?.url && pathname.startsWith(c.url + "/"))
     );
 }
