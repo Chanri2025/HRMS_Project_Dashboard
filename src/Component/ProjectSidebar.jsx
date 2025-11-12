@@ -24,7 +24,8 @@ import {
     filterMenuByRole,
     getCurrentRole,
     buildLabelMap, // if you need role-aware breadcrumbs
-} from "@/Utils/navigation.js"; // <- corrected path
+} from "@/Utils/navigation.js";
+import Logo from "@/assets/logo.svg"; // <- corrected path
 
 export function ProjectSidebar() {
     const {pathname} = useLocation();
@@ -47,8 +48,8 @@ export function ProjectSidebar() {
         <Sidebar>
             <SidebarContent>
                 <div className="px-6 py-4">
-                    <h1 className="text-xl font-bold text-foreground">Appynitty</h1>
-                    <p className="text-sm text-muted-foreground">Project Management</p>
+                    <img src={Logo} alt="SM Logo" className="mb-4 w-40 h-50 mx-auto"/>
+                    <p className="text-sm text-muted-foreground text-center">Project Management</p>
                 </div>
 
                 <SidebarGroup>

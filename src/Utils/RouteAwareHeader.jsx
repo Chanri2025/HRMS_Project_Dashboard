@@ -6,19 +6,30 @@ import AppBreadcrumbs from "@/Utils/AppBreadcrumbs.jsx";
 import HeaderBar from "@/Utils/HeaderBar.jsx";
 
 function isProjectRoute(path) {
+    // any route where the Project page renders its own big header
     return path.startsWith("/project") || path.startsWith("/board");
 }
 
 export default function RouteAwareHeader() {
     const {pathname} = useLocation();
 
-    // On project routes, DON'T render a header here.
-    // The Project page itself renders <ProjectHeader />, avoiding duplicates.
     if (isProjectRoute(pathname)) {
-        return null;
+        // Slim breadcrumb strip for project routes (avoids double header)
+        return (
+            <div className="border-b bg-card">
+                <div className="flex items-center justify-between px-4 h-14">
+                    <div className="flex items-center gap-3 min-w-0 overflow-hidden">
+                        <SidebarTrigger/>
+                        <AppBreadcrumbs/>
+                    </div>
+                    {/* keep right side minimal (or remove if you want absolutely nothing) */}
+                     <HeaderBar />
+                </div>
+            </div>
+        );
     }
 
-    // On all other routes, render the regular header.
+    // Regular header everywhere else
     return (
         <div className="border-b bg-card">
             <div className="flex items-center justify-between px-4 h-14">

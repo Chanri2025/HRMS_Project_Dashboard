@@ -82,7 +82,7 @@ export const MENU = [
             {
                 title: "Create Project",
                 url: "/project/add",
-                allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER", "EMPLOYEE"],
+                allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER"],
             },
             {
                 title: "Scrum Dashboard",

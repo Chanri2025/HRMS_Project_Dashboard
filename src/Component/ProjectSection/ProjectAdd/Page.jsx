@@ -4,8 +4,8 @@ import {
     useProjectById,
     useProjectMembers,
     useDeleteProject,
-    useUserById, // 👈 import
 } from "@/hooks/useActiveProjects.js";
+import {useUserLabel} from "@/hooks/useOrgLookups.js";
 import ConfirmDialog from "@/Utils/ConfirmDialog.jsx";
 
 import {Card, CardHeader, CardTitle, CardContent} from "@/components/ui/card";
@@ -26,9 +26,7 @@ import {
     Plus,
     FolderKanban,
     Users,
-    ListChecks,
     Sparkles,
-    Edit3,
     Trash2,
 } from "lucide-react";
 import NewProjectModal from "./NewProjectModal.jsx";
@@ -76,30 +74,19 @@ function StatCard({icon: Icon, label, value, hint, accent = ""}) {
 /* ----------------------- Quick View Modal (inline) ------------------------ */
 
 function MemberRow({m}) {
-    const userId = m.userId ?? m.id ?? null;
-    const {data: user, isLoading} = useUserById(userId);
+    const uid = m.userId ?? m.id ?? null;
+    const {name: labelName} = useUserLabel(uid);
 
-    const fullName =
-        user?.employee?.full_name ||
-        user?.full_name ||
-        user?.name ||
-        m.fullName ||
-        m.email ||
-        "Member";
+    const displayName = labelName || m.fullName || m.email || "Member";
+    const email = m.email || "";
 
-    const email =
-        user?.employee?.email ||
-        user?.email ||
-        m.email ||
-        "";
-
-    const initials = React.useMemo(() => {
-        const base = fullName || email || "U";
+    const initials = useMemo(() => {
+        const base = displayName || email || "U";
         const parts = String(base).trim().split(/\s+/);
         const a = (parts[0]?.[0] || "").toUpperCase();
         const b = (parts[1]?.[0] || "").toUpperCase();
         return (a + b) || "U";
-    }, [fullName, email]);
+    }, [displayName, email]);
 
     return (
         <div className="flex items-center justify-between py-2">
@@ -108,12 +95,8 @@ function MemberRow({m}) {
                     <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
                 <div className="leading-tight">
-                    <div className="text-sm font-medium">
-                        {isLoading ? "Loading…" : fullName}
-                    </div>
-                    {email ? (
-                        <div className="text-[11px] text-muted-foreground">{email}</div>
-                    ) : null}
+                    <div className="text-sm font-medium">{displayName}</div>
+                    {email ? <div className="text-[11px] text-muted-foreground">{email}</div> : null}
                 </div>
             </div>
         </div>
@@ -124,8 +107,6 @@ function ProjectQuickViewDialog({
                                     open,
                                     onOpenChange,
                                     projectId,
-                                    onEditClick,
-                                    onCreateSubproject,
                                 }) {
     const {data: project, isLoading, isError} = useProjectById(open ? projectId : null);
     const {data: members = [], isLoading: membersLoading} = useProjectMembers(open ? projectId : null);
@@ -153,7 +134,7 @@ function ProjectQuickViewDialog({
                             {project?.name || "Project"}
                         </DialogTitle>
                         <DialogDescription>
-                            Quick snapshot of project details, members, and metadata.
+                            Quick snapshot of project details and members.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -169,32 +150,19 @@ function ProjectQuickViewDialog({
                                 <Trash2 className="h-4 w-4 mr-1"/>
                                 {deleteProject.isLoading ? "Deleting..." : "Delete"}
                             </Button>
-
-                            {onCreateSubproject && (
-                                <Button size="sm" onClick={() => onCreateSubproject(projectId)}>
-                                    <ListChecks className="h-4 w-4 mr-1"/>
-                                    Create Sub Project
-                                </Button>
-                            )}
-
-                            {onEditClick && (
-                                <Button size="sm" variant="secondary" onClick={() => onEditClick(project)}>
-                                    <Edit3 className="h-4 w-4 mr-1"/>
-                                    Edit
-                                </Button>
-                            )}
                         </div>
                     </div>
 
                     <Separator className="my-3"/>
 
+                    {/* Only two tabs now */}
                     <Tabs defaultValue="overview" className="w-full">
-                        <TabsList className="grid grid-cols-3 w-full">
+                        <TabsList className="grid grid-cols-2 w-full">
                             <TabsTrigger value="overview">Overview</TabsTrigger>
                             <TabsTrigger value="members">Members</TabsTrigger>
-                            <TabsTrigger value="meta">Meta</TabsTrigger>
                         </TabsList>
 
+                        {/* Overview */}
                         <TabsContent value="overview" className="mt-4">
                             <Card className="bg-card/70 border-border/60 rounded-xl">
                                 <CardContent className="p-4 space-y-3">
@@ -229,6 +197,7 @@ function ProjectQuickViewDialog({
                             </Card>
                         </TabsContent>
 
+                        {/* Members */}
                         <TabsContent value="members" className="mt-4">
                             <Card className="bg-card/70 border-border/60 rounded-xl">
                                 <CardContent className="p-4">
@@ -246,32 +215,18 @@ function ProjectQuickViewDialog({
                                 </CardContent>
                             </Card>
                         </TabsContent>
-
-                        <TabsContent value="meta" className="mt-4">
-                            <div className="grid sm:grid-cols-2 gap-3">
-                                <Card className="bg-card/70 border-border/60 rounded-xl">
-                                    <CardContent className="p-4">
-                                        <div className="text-xs text-muted-foreground">Project ID</div>
-                                        <div className="text-sm">{projectId || "—"}</div>
-                                    </CardContent>
-                                </Card>
-                                <Card className="bg-card/70 border-border/60 rounded-xl">
-                                    <CardContent className="p-4">
-                                        <div className="text-xs text-muted-foreground">Created By</div>
-                                        <div className="text-sm">{project?.createdById ?? "—"}</div>
-                                    </CardContent>
-                                </Card>
-                            </div>
-                        </TabsContent>
                     </Tabs>
                 </DialogContent>
             </Dialog>
 
+            {/* Confirm Delete */}
             <ConfirmDialog
                 open={confirmDeleteOpen}
                 onOpenChange={setConfirmDeleteOpen}
                 title="Delete this project?"
-                description={`"${project?.name || "Project"}" will be permanently removed. This cannot be undone.`}
+                description={`"${
+                    project?.name || "Project"
+                }" will be permanently removed. This cannot be undone.`}
                 confirmText={deleteProject.isLoading ? "Deleting..." : "Delete"}
                 cancelText="Cancel"
                 variant="destructive"
@@ -350,17 +305,6 @@ export default function ProjectsPage() {
         setPreviewOpen(true);
     };
 
-    // Optional callbacks to hook into your existing edit/subproject modals elsewhere.
-    const handleEditFromQuickView = () => {
-        // setPreviewOpen(false);
-        // open your edit modal here
-    };
-
-    const handleSubprojectFromQuickView = () => {
-        // setPreviewOpen(false);
-        // open your subproject modal here
-    };
-
     return (
         <div className="space-y-6 p-6">
             {/* HERO */}
@@ -394,13 +338,6 @@ export default function ProjectsPage() {
                     accent="bg-blue-100 text-blue-700"
                 />
                 <StatCard
-                    icon={ListChecks}
-                    label="My Scrums"
-                    value={0}
-                    hint="Total"
-                    accent="bg-violet-100 text-violet-700"
-                />
-                <StatCard
                     icon={Users}
                     label="Team Members"
                     value={3}
@@ -413,6 +350,13 @@ export default function ProjectsPage() {
                     value="—"
                     hint=""
                     accent="bg-amber-100 text-amber-700"
+                />
+                <StatCard
+                    icon={FolderKanban}
+                    label="Projects"
+                    value={all.length}
+                    hint="Total"
+                    accent="bg-violet-100 text-violet-700"
                 />
             </div>
 
@@ -458,8 +402,6 @@ export default function ProjectsPage() {
                 open={previewOpen}
                 onOpenChange={setPreviewOpen}
                 projectId={selectedId}
-                onEditClick={handleEditFromQuickView}
-                onCreateSubproject={handleSubprojectFromQuickView}
             />
         </div>
     );
