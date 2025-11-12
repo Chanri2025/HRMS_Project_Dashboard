@@ -154,3 +154,37 @@ export function useUpdateSubProject() {
         },
     });
 }
+
+// Delete: DELETE /sub-projects/:id
+export function useDeleteSubProject() {
+  const ctx = getUserCtx();
+  const accessToken = ctx?.accessToken || "";
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    // You can pass { id, projectId } so we can invalidate the parent project
+    mutationFn: async ({ id }) => {
+      if (!accessToken) throw new Error("No access token");
+      if (!id) throw new Error("Missing subproject id");
+
+      const res = await http.delete(`/sub-projects/${id}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      return res.data;
+    },
+    onSuccess: (_data, { projectId }) => {
+      toast.success("Sub project deleted successfully");
+      // Refresh sub-project list and any affected project views
+      queryClient.invalidateQueries(["sub-projects"]);
+      if (projectId) {
+        queryClient.invalidateQueries(["projects", projectId]);
+      }
+      queryClient.invalidateQueries(["projects", "all"]);
+    },
+    onError: (error) => {
+      toast.error(errText(error) || "Failed to delete sub project");
+    },
+  });
+}
+

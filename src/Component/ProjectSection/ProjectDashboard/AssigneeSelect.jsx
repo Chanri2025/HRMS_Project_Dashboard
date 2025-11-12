@@ -1,3 +1,4 @@
+// src/Component/ProjectSection/ProjectDashboard/AssigneeSelect.jsx
 import React, {useMemo} from "react";
 import {
     Select,
@@ -6,146 +7,77 @@ import {
     SelectContent,
     SelectItem,
 } from "@/components/ui/select.tsx";
-import {useProjectMembers, useUserById} from "@/hooks/useActiveProjects.js";
+import {useProjectMembers} from "@/hooks/useActiveProjects.js";
+import {useUserLabel} from "@/hooks/useOrgLookups.js";
+
+const UNASSIGNED = "__UNASSIGNED__"; // non-empty sentinel to avoid Radix error
+
+// Row label that loads the user's REAL name and shows only the name
+function AssigneeRow({id}) {
+    const {name} = useUserLabel(id); // <- hook also returns .name
+    return <span className="text-xs">{name || "User"}</span>;
+}
+
+// Selected text (only the name)
+function SelectedText({id}) {
+    const {name} = useUserLabel(id);
+    return <span className="truncate">{name || "User"}</span>;
+}
 
 /**
- * AssigneeSelect
- *
  * Props:
  *  - projectId: number | string | null
- *  - value: userId | null
- *  - onChange: (userIdOrNull) => void
+ *  - value: number | null
+ *  - onChange: (number|null) => void
  *  - className?: string
  */
 export function AssigneeSelect({projectId, value, onChange, className}) {
-    const {
-        data: projectMembers = [],
-        isLoading,
-    } = useProjectMembers(projectId);
+    const {data: projectMembers = [], isLoading} = useProjectMembers(projectId);
 
-    // Build options from project members (normalize all possible name fields)
-    const options = useMemo(
-        () =>
-            (projectMembers || [])
-                .map((m) => {
-                    const userId =
-                        m.userId ??
-                        m.user_id ??
-                        m.id ??
-                        null;
-
-                    if (!userId) return null;
-
-                    const fullName =
-                        m.fullName ||                    // from normalizeProjectMember
-                        m.full_name ||                   // raw API variant
-                        m.name ||
-                        m.employee?.full_name ||
-                        "";
-
-                    const email =
-                        m.email ||
-                        m.employee?.email ||
-                        "";
-
-                    const label =
-                        fullName ||
-                        email ||
-                        `User #${userId}`;
-
-                    const subtitle = [email].filter(Boolean).join(" • ");
-
-                    return {
-                        userId: String(userId),
-                        label,
-                        subtitle,
-                    };
-                })
-                .filter(Boolean),
-        [projectMembers]
-    );
-
-    // If current value is not in project members, fetch it directly
-    const hasSelected =
-        value !== undefined && value !== null && value !== "";
-    const selectedIdStr = hasSelected ? String(value) : "";
-
-    const selectedInOptions = options.find(
-        (o) => o.userId === selectedIdStr
-    );
-
-    const shouldLoadFallback = hasSelected && !selectedInOptions;
-    const {data: fallbackUser} = useUserById(
-        shouldLoadFallback ? value : null
-    );
-
-    const fallbackOption = shouldLoadFallback && fallbackUser
-        ? {
-            userId: String(
-                fallbackUser.user_id ??
-                fallbackUser.id ??
-                value
-            ),
-            label:
-                fallbackUser.employee?.full_name ||
-                fallbackUser.full_name ||
-                `User #${value}`,
-            subtitle: fallbackUser.email || "",
+    // Only collect userIds from members; names come from useUserLabel
+    const optionIds = useMemo(() => {
+        const ids = new Set();
+        for (const m of projectMembers || []) {
+            const id = m?.userId ?? m?.user_id ?? m?.id;
+            if (id != null) ids.add(String(id));
         }
-        : null;
+        return Array.from(ids);
+    }, [projectMembers]);
 
-    const allOptions = [...options, ...(fallbackOption ? [fallbackOption] : [])];
-
-    const selected = allOptions.find(
-        (o) => o.userId === selectedIdStr
-    );
+    const hasSelected = value !== undefined && value !== null && value !== "";
+    const selectedIdStr = hasSelected ? String(value) : undefined;
 
     const handleChange = (next) => {
+        if (next === UNASSIGNED) return onChange(null);
         onChange(next ? Number(next) : null);
     };
 
     return (
         <Select
-            value={selected ? selected.userId : ""}
+            value={selectedIdStr ?? (hasSelected ? UNASSIGNED : undefined)}
             onValueChange={handleChange}
-            disabled={isLoading || !allOptions.length}
+            disabled={isLoading || optionIds.length === 0}
         >
-            <SelectTrigger
-                className={className || "w-full h-8 text-[11px] justify-between"}
-            >
+            <SelectTrigger className={className || "w-full h-8 text-[11px] justify-between"}>
                 <SelectValue
                     placeholder={
                         isLoading
                             ? "Loading members..."
-                            : allOptions.length
+                            : optionIds.length
                                 ? "Select assignee"
                                 : "No members available"
                     }
                 >
-                    {selected ? (
-                        <span className="truncate">
-              {selected.label}
-                            {selected.subtitle && (
-                                <span className="text-[9px] text-muted-foreground">
-                  {" "}
-                                    — {selected.subtitle}
-                </span>
-                            )}
-            </span>
-                    ) : null}
+                    {selectedIdStr ? <SelectedText id={selectedIdStr}/> : null}
                 </SelectValue>
             </SelectTrigger>
 
             <SelectContent>
-                {allOptions.map((opt) => (
-                    <SelectItem key={opt.userId} value={opt.userId}>
+                <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                {optionIds.map((id) => (
+                    <SelectItem key={id} value={id}>
                         <div className="flex flex-col">
-                            <span className="text-xs">{opt.label}</span>
-                            {opt.subtitle && (
-                                <span className="text-[9px] text-muted-foreground">
-                  {opt.subtitle}
-                </span>
-                            )}
+                            <AssigneeRow id={id}/>
                         </div>
                     </SelectItem>
                 ))}

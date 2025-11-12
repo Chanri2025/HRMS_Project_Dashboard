@@ -1,20 +1,20 @@
 import React, {useEffect, useState, useMemo} from "react";
 import {Badge} from "@/components/ui/badge.tsx";
 import {Avatar, AvatarFallback} from "@/components/ui/avatar.tsx";
-import {Clock, MessageSquare, Calendar as CalendarIcon} from "lucide-react";
+import {Button} from "@/components/ui/button";
+import {Clock, MessageSquare, Calendar as CalendarIcon, Trash2, Save, X} from "lucide-react";
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog.tsx";
+import {Separator} from "@/components/ui/separator";
 
-import {useUpdateSubProject} from "@/hooks/useSubProjects.js";
-import {useUserById} from "@/hooks/useActiveProjects.js";
+import {useUpdateSubProject, useDeleteSubProject} from "@/hooks/useSubProjects.js";
+import {useUserById, useProjectById} from "@/hooks/useActiveProjects.js";
+import {useUserLabel} from "@/hooks/useOrgLookups.js";
 
 import {ShadcnDateTimePicker} from "@/Utils/ShadcnDateTimePicker.jsx";
 import {AssigneeSelect} from "@/Component/ProjectSection/ProjectDashboard/AssigneeSelect.jsx";
+import ConfirmDialog from "@/Utils/ConfirmDialog.jsx";
 
 // --- Priority colors (keep in sync with TaskCard) ---
 const badgePriorityColors = {
@@ -25,19 +25,11 @@ const badgePriorityColors = {
 };
 
 function getInitials(name = "") {
-    return (
-        name
-            .trim()
-            .split(/\s+/)
-            .slice(0, 2)
-            .map((part) => part[0]?.toUpperCase() || "")
-            .join("") || "NA"
-    );
+    return (name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() || "").join("") || "NA");
 }
 
 function parseCreatedOn(dateStr) {
     if (!dateStr) return null;
-
     let parsedDate = null;
 
     if (dateStr instanceof Date && !isNaN(dateStr.getTime())) {
@@ -62,13 +54,11 @@ function parseCreatedOn(dateStr) {
                     Sep: 8,
                     Oct: 9,
                     Nov: 10,
-                    Dec: 11,
+                    Dec: 11
                 };
                 const month = months[monStr];
                 if (month !== undefined) {
-                    let h = 0,
-                        m = 0,
-                        s = 0;
+                    let h = 0, m = 0, s = 0;
                     if (timePart) {
                         const parts = timePart.split(":");
                         h = Number(parts[0] || 0);
@@ -78,101 +68,60 @@ function parseCreatedOn(dateStr) {
                     const mer = (meridiem || "").toUpperCase();
                     if (mer === "PM" && h < 12) h += 12;
                     if (mer === "AM" && h === 12) h = 0;
-
-                    parsedDate = new Date(
-                        Number(yyyy),
-                        month,
-                        Number(dd),
-                        h,
-                        m,
-                        s
-                    );
+                    parsedDate = new Date(Number(yyyy), month, Number(dd), h, m, s);
                 }
             }
         }
     }
-
     if (parsedDate && !isNaN(parsedDate.getTime())) {
         return new Date(parsedDate.getTime() + 5.5 * 60 * 60 * 1000);
     }
-
     return null;
 }
 
 function calcDaysElapsed(start) {
     if (!start) return null;
-    const now = new Date();
-    const diffMs = now.getTime() - start.getTime();
-    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const days = Math.floor((Date.now() - start.getTime()) / 86400000);
     return days >= 0 ? days : 0;
 }
 
 function calcDaysRemaining(end) {
     if (!end) return null;
-    const now = new Date();
-    const diffMs = end.getTime() - now.getTime();
-    const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const days = Math.ceil((end.getTime() - Date.now()) / 86400000);
     return days > 0 ? days : 0;
 }
 
 function formatStatus(status = "") {
     const s = status.toString().trim();
-    if (!s) return "";
-    return s[0].toUpperCase() + s.slice(1);
+    return s ? s[0].toUpperCase() + s.slice(1) : "";
 }
 
 export function TaskDetailsDialog(props) {
     const {
-        open,
-        onOpenChange,
-        id,
-        projectId,
-        assignedBy,
-        createdOn,
-        lastModified,
-        title,
-        description,
-        status,
-        assigneeId,
-        safePriority,
-        endDate,
-        storyPoints,
-        comments,
+        open, onOpenChange, id, projectId, assignedBy, createdOn, lastModified,
+        title, description, status, assigneeId, safePriority, endDate, storyPoints, comments,
     } = props;
 
     const createdAt = parseCreatedOn(createdOn);
     const updatedAt = parseCreatedOn(lastModified);
-    const initialDue =
-        endDate instanceof Date
-            ? endDate
-            : endDate
-                ? parseCreatedOn(endDate)
-                : null;
+    const initialDue = endDate instanceof Date ? endDate : endDate ? parseCreatedOn(endDate) : null;
 
     const daysElapsed = createdAt ? calcDaysElapsed(createdAt) : null;
-    const initialRemaining = initialDue
-        ? calcDaysRemaining(initialDue)
-        : null;
+    const initialRemaining = initialDue ? calcDaysRemaining(initialDue) : null;
 
     // editable state
     const [nameInput, setNameInput] = useState(title || "");
     const [descInput, setDescInput] = useState(description || "");
     const [statusInput, setStatusInput] = useState(status || "To Do");
     const [assigneeInput, setAssigneeInput] = useState(assigneeId || null);
-    const [deadlineIso, setDeadlineIso] = useState(
-        initialDue ? initialDue.toISOString() : ""
-    );
+    const [deadlineIso, setDeadlineIso] = useState(initialDue ? initialDue.toISOString() : "");
+
+    // confirm delete dialog visibility
+    const [confirmOpen, setConfirmOpen] = useState(false);
 
     useEffect(() => {
         if (!open) return;
-
-        const freshDue =
-            endDate instanceof Date
-                ? endDate
-                : endDate
-                    ? parseCreatedOn(endDate)
-                    : null;
-
+        const freshDue = endDate instanceof Date ? endDate : endDate ? parseCreatedOn(endDate) : null;
         setNameInput(title || "");
         setDescInput(description || "");
         setStatusInput(status || "To Do");
@@ -184,7 +133,6 @@ export function TaskDetailsDialog(props) {
     // resolve assignee for header pill
     const selectedAssigneeId = assigneeInput || assigneeId || null;
     const {data: assigneeUser} = useUserById(selectedAssigneeId);
-
     const assigneeName = useMemo(
         () =>
             assigneeUser?.employee?.full_name ||
@@ -192,20 +140,19 @@ export function TaskDetailsDialog(props) {
             (selectedAssigneeId ? `User ${selectedAssigneeId}` : "Unassigned"),
         [assigneeUser, selectedAssigneeId]
     );
-
     const assigneeInitials = getInitials(assigneeName);
 
     // recompute remaining
     const currentDue =
-        deadlineIso && !Number.isNaN(new Date(deadlineIso).getTime())
-            ? new Date(deadlineIso)
-            : initialDue;
-    const daysRemaining =
-        currentDue != null
-            ? calcDaysRemaining(currentDue)
-            : initialRemaining;
+        deadlineIso && !Number.isNaN(new Date(deadlineIso).getTime()) ? new Date(deadlineIso) : initialDue;
+    const daysRemaining = currentDue != null ? calcDaysRemaining(currentDue) : initialRemaining;
 
     const {mutate: updateSubProject, isLoading} = useUpdateSubProject();
+    const {mutate: deleteSubProject, isLoading: isDeleting} = useDeleteSubProject();
+
+    // Labels
+    const {label: assignedByLabel} = useUserLabel(assignedBy);
+    const {data: project} = useProjectById(projectId);
 
     const handleSave = () => {
         const payload = {
@@ -214,198 +161,229 @@ export function TaskDetailsDialog(props) {
             project_status: statusInput,
             assigned_to: assigneeInput || null,
             subproject_deadline: deadlineIso || null,
-            // project_id / assigned_by / created_on are intentionally not sent
         };
+        updateSubProject({id, data: payload, projectId}, {onSuccess: () => onOpenChange(false)});
+    };
 
-        updateSubProject(
-            {id, data: payload, projectId},
+    const handleDelete = async () => {
+        await deleteSubProject(
+            {id, projectId},
             {
-                onSuccess: () => onOpenChange(false),
+                onSuccess: () => {
+                    setConfirmOpen(false);
+                    onOpenChange(false);
+                }
             }
         );
     };
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl p-6 rounded-2xl">
-                {/* Header */}
-                <DialogHeader className="mb-2 mt-4">
-                    <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                            <DialogTitle className="text-xl font-semibold">
-                                <input
-                                    className="bg-transparent border-none outline-none p-0 m-0 text-xl font-semibold w-full"
-                                    value={nameInput}
-                                    onChange={(e) => setNameInput(e.target.value)}
-                                />
-                            </DialogTitle>
+        <>
+            <Dialog open={open} onOpenChange={onOpenChange}>
+                <DialogContent
+                    className="
+            sm:max-w-5xl p-0 overflow-hidden
+            rounded-2xl border border-border/60 shadow-2xl
+            bg-gradient-to-b from-background via-background/60 to-muted/30
+            backdrop-blur supports-[backdrop-filter]:bg-background/80
+          "
+                >
+                    <DialogHeader
+                        className="
+              sticky top-0 z-10 bg-card/80 backdrop-blur
+              border-b border-border/60 px-6 pt-5 pb-4
+            "
+                    >
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                                <DialogTitle className="text-xl font-semibold">
+                                    <input
+                                        className="bg-transparent border-none outline-none p-0 m-0 w-full text-xl font-semibold tracking-tight placeholder:text-muted-foreground/60"
+                                        value={nameInput}
+                                        onChange={(e) => setNameInput(e.target.value)}
+                                        placeholder="Untitled sub-project"
+                                    />
+                                </DialogTitle>
 
-                            <DialogDescription className="mt-1 text-xs flex items-center gap-2">
-                                <span className="text-muted-foreground">Status:</span>
-                                <select
-                                    className="border rounded px-2 py-0.5 text-[10px]"
-                                    value={statusInput}
-                                    onChange={(e) => setStatusInput(e.target.value)}
+                                <DialogDescription className="mt-2 text-xs flex flex-wrap items-center gap-2">
+                                    <span className="text-muted-foreground">Status:</span>
+                                    <select
+                                        className="text-[10px] px-2 py-1 rounded-md border border-border/60 bg-muted/40 hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
+                                        value={statusInput}
+                                        onChange={(e) => setStatusInput(e.target.value)}
+                                    >
+                                        <option value="Backlog">Backlog</option>
+                                        <option value="To Do">To Do</option>
+                                        <option value="Development">In Progress</option>
+                                        <option value="Completed">Completed</option>
+                                        <option value="Active">Active</option>
+                                    </select>
+                                    {!!statusInput && (
+                                        <span className="text-[10px] text-muted-foreground">
+                      ({formatStatus(statusInput)})
+                    </span>
+                                    )}
+                                </DialogDescription>
+
+                                {/* Meta (IDs removed; show names instead) */}
+                                <div
+                                    className="mt-2 text-[10px] text-muted-foreground/90 flex flex-wrap gap-x-6 gap-y-1">
+                                    {projectId != null && (
+                                        <div>
+                                            Project:{" "}
+                                            <span className="font-medium text-foreground">
+                        {project?.name ? `${project.name} (#${projectId})` : `Project (#${projectId})`}
+                      </span>
+                                        </div>
+                                    )}
+                                    {assignedBy != null && (
+                                        <div>
+                                            Assigned By:{" "}
+                                            <span className="font-medium text-foreground">
+                        {assignedByLabel || `User (#${assignedBy})`}
+                      </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Right side */}
+                            <div className="flex flex-col items-end gap-2">
+                                <Badge
+                                    className={`px-4 py-1 rounded-full text-xs font-semibold capitalize ring-1 ring-inset ring-border/70 ${badgePriorityColors[safePriority]}`}
                                 >
-                                    <option value="Backlog">Backlog</option>
-                                    <option value="To Do">To Do</option>
-                                    <option value="Development">In Progress</option>
-                                    <option value="Completed">Completed</option>
-                                    <option value="Active">Active</option>
-                                </select>
-                                {statusInput && (
-                                    <span className="text-[10px] text-muted-foreground">
-                    ({formatStatus(statusInput)})
+                                    {safePriority}
+                                </Badge>
+
+                                {daysRemaining != null && (
+                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                        <CalendarIcon className="h-3 w-3"/>
+                                        <span>{daysRemaining} days remaining</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </DialogHeader>
+
+                    {/* Body */}
+                    <div className="px-6 py-5 space-y-6">
+                        {/* Description */}
+                        <section
+                            className="rounded-xl border border-border/60 bg-card/60 p-4 transition-shadow hover:shadow-sm">
+                            <p className="font-semibold mb-2 text-xs text-foreground/90">Description</p>
+                            <textarea
+                                className="w-full rounded-md text-xs border border-border/60 bg-background/60 px-3 py-2 resize-y placeholder:text-muted-foreground/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                                rows={3}
+                                value={descInput}
+                                onChange={(e) => setDescInput(e.target.value)}
+                                placeholder="Add a description..."
+                            />
+                        </section>
+
+                        {/* Assignee + Due date */}
+                        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div
+                                className="rounded-xl border border-border/60 bg-card/60 p-4 transition-shadow hover:shadow-sm">
+                                <p className="font-semibold text-[11px] mb-3 text-foreground/90">Assignee</p>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Avatar className="h-8 w-8 ring-1 ring-border/60">
+                                        <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                                            {assigneeInitials}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-xs font-medium">
+                    {assigneeName}
                   </span>
-                                )}
-                            </DialogDescription>
+                                </div>
+                                <AssigneeSelect
+                                    projectId={projectId}
+                                    value={assigneeInput}
+                                    onChange={setAssigneeInput}
+                                />
+                            </div>
 
-                            {/* IDs & meta */}
-                            <div className="mt-2 text-[9px] text-muted-foreground grid grid-cols-3 gap-y-0.5 gap-x-4">
+                            <div
+                                className="rounded-xl border border-border/60 bg-card/60 p-4 transition-shadow hover:shadow-sm">
+                                <p className="font-semibold text-[11px] mb-3 text-foreground/90">Due date &amp; time</p>
+                                <ShadcnDateTimePicker
+                                    value={deadlineIso}
+                                    onChange={setDeadlineIso}
+                                    placeholder="Pick due date & time"
+                                    className="h-8 text-[11px]"
+                                />
+                            </div>
+                        </section>
+
+                        {/* System meta */}
+                        <section
+                            className="rounded-xl border border-border/60 bg-card/60 p-4 transition-shadow hover:shadow-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-[11px] text-muted-foreground">
                                 <div>
-                                    Subproject ID:{" "}
-                                    <span className="font-medium">{id}</span>
+                                    <p className="font-semibold mb-1 text-foreground/90">Created On</p>
+                                    <p className="flex flex-wrap gap-1">
+                                        <span>{createdAt ? createdAt.toLocaleString() : "—"}</span>
+                                        {daysElapsed != null && <span>• {daysElapsed} days ago</span>}
+                                    </p>
                                 </div>
-                                {projectId != null && (
-                                    <div>
-                                        Project ID:{" "}
-                                        <span className="font-medium">{projectId}</span>
-                                    </div>
-                                )}
-                                {assignedBy != null && (
-                                    <div>
-                                        Assigned By:{" "}
-                                        <span className="font-medium">{assignedBy}</span>
-                                    </div>
-                                )}
+                                <div>
+                                    <p className="font-semibold mb-1 text-foreground/90">Last Modified</p>
+                                    <p>{updatedAt ? updatedAt.toLocaleString() : "—"}</p>
+                                </div>
                             </div>
-                        </div>
+                        </section>
 
-                        {/* Right side */}
-                        <div className="flex flex-col items-end gap-2">
-                            <Badge
-                                className={`px-4 py-1 rounded-full text-xs font-semibold capitalize ${badgePriorityColors[safePriority]}`}
+
+                        {/* Actions */}
+                        <div
+                            className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                className="w-full sm:w-auto"
+                                onClick={() => setConfirmOpen(true)}
+                                disabled={isDeleting}
                             >
-                                {safePriority}
-                            </Badge>
+                                <Trash2 className="h-4 w-4 mr-2"/>
+                                {isDeleting ? "Deleting..." : "Delete"}
+                            </Button>
 
-                            {daysRemaining != null && (
-                                <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
-                                    <CalendarIcon className="h-3 w-3"/>
-                                    <span>{daysRemaining} days remaining</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </DialogHeader>
-
-                {/* Body */}
-                <div className="space-y-6 text-sm">
-                    {/* Description */}
-                    <div>
-                        <p className="font-semibold mb-1 text-xs">Description</p>
-                        <textarea
-                            className="w-full border rounded-md px-3 py-2 text-xs resize-y"
-                            rows={3}
-                            value={descInput}
-                            onChange={(e) => setDescInput(e.target.value)}
-                            placeholder="Add a description..."
-                        />
-                    </div>
-
-                    {/* Assignee + Due date */}
-                    <div className="grid grid-cols-2 gap-8">
-                        <div>
-                            <p className="font-semibold text-[11px] mb-2">Assignee</p>
-
-                            <div className="flex items-center gap-2 mb-2">
-                                <Avatar className="h-7 w-7">
-                                    <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                                        {assigneeInitials}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <span className="text-xs font-medium">
-                  {assigneeName}
-                </span>
+                            <div className="flex gap-2 w-full sm:w-auto">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full sm:w-auto"
+                                    onClick={() => onOpenChange(false)}
+                                >
+                                    <X className="h-4 w-4 mr-2"/>
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="button"
+                                    className="w-full sm:w-auto"
+                                    onClick={handleSave}
+                                    disabled={isLoading}
+                                >
+                                    <Save className="h-4 w-4 mr-2"/>
+                                    {isLoading ? "Saving..." : "Save changes"}
+                                </Button>
                             </div>
-
-                            {/* Dropdown shows names from project members */}
-                            <AssigneeSelect
-                                projectId={projectId}
-                                value={assigneeInput}
-                                onChange={setAssigneeInput}
-                            />
-                        </div>
-
-                        <div>
-                            <p className="font-semibold text-[11px] mb-2">
-                                Due date &amp; time
-                            </p>
-                            <ShadcnDateTimePicker
-                                value={deadlineIso}
-                                onChange={setDeadlineIso}
-                                placeholder="Pick due date & time"
-                                className="h-8 text-[11px]"
-                            />
                         </div>
                     </div>
+                </DialogContent>
+            </Dialog>
 
-                    {/* System meta */}
-                    <div className="grid grid-cols-2 gap-8 text-[9px] text-muted-foreground">
-                        <div>
-                            <p className="font-semibold mb-1">Created On</p>
-                            <p>
-                                {createdAt ? createdAt.toLocaleString() : "—"}
-                                {daysElapsed != null &&
-                                    `  •  ${daysElapsed} days ago`}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="font-semibold mb-1">Last Modified</p>
-                            <p>
-                                {updatedAt ? updatedAt.toLocaleString() : "—"}
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Extra meta */}
-                    {(storyPoints || comments) && (
-                        <div className="flex gap-8 text-[10px] text-muted-foreground">
-                            {storyPoints ? (
-                                <div className="flex items-center gap-1">
-                                    <Clock className="h-3 w-3"/>
-                                    <span>Story Points: {storyPoints}</span>
-                                </div>
-                            ) : null}
-                            {comments ? (
-                                <div className="flex items-center gap-1">
-                                    <MessageSquare className="h-3 w-3"/>
-                                    <span>Comments: {comments}</span>
-                                </div>
-                            ) : null}
-                        </div>
-                    )}
-
-                    {/* Actions */}
-                    <div className="flex justify-end gap-2 pt-2">
-                        <button
-                            type="button"
-                            className="px-3 py-1.5 text-[10px] rounded-md border border-muted-foreground/20"
-                            onClick={() => onOpenChange(false)}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            className="px-4 py-1.5 text-[10px] rounded-md bg-primary text-primary-foreground disabled:opacity-60"
-                            onClick={handleSave}
-                            disabled={isLoading}
-                        >
-                            {isLoading ? "Saving..." : "Save changes"}
-                        </button>
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
+            {/* Confirm Delete */}
+            <ConfirmDialog
+                open={confirmOpen}
+                onOpenChange={setConfirmOpen}
+                title="Delete Sub-Project?"
+                description="This will permanently remove the sub-project and its related data. This action cannot be undone."
+                confirmText="Delete"
+                cancelText="Cancel"
+                variant="destructive"
+                onConfirm={handleDelete}
+                loading={isDeleting}
+            />
+        </>
     );
 }
