@@ -4,7 +4,7 @@ import {useUserById} from "@/hooks/useActiveProjects.js";
 import {
     parseCreatedOn,
     calcDaysElapsed,
-} from "../../../../Utils/ProjectHeader.helpers.js";
+} from "../../../../Utils/Timestamp.helpers.js";
 import {SprintHeaderTitle} from "./SprintHeaderTitle.jsx";
 import {ProjectHeaderActions} from "./ProjectHeaderActions.jsx";
 import {ProjectHeaderStats} from "./ProjectHeaderStats.jsx";
