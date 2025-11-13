@@ -1,9 +1,15 @@
-// src/App.jsx (or wherever this file lives)
+// src/App.jsx
 import {Toaster} from "@/components/ui/toaster";
 import {Toaster as Sonner} from "@/components/ui/sonner";
 import {TooltipProvider} from "@/components/ui/tooltip";
 import {QueryClient, QueryClientProvider} from "@tanstack/react-query";
-import {BrowserRouter, Routes, Route, Navigate, useNavigate} from "react-router-dom";
+import {
+    HashRouter,
+    Routes,
+    Route,
+    Navigate,
+    useNavigate,
+} from "react-router-dom";
 import {SidebarProvider} from "@/components/ui/sidebar";
 import {ProjectSidebar} from "@/Component/ProjectSidebar.jsx";
 import RouteAwareHeader from "@/Utils/RouteAwareHeader.jsx";
@@ -24,9 +30,13 @@ import QuickAddPage from "@/Component/Organisation/QuickAdd/QuickAddPage.jsx";
 import EmployeeDashboard from "@/Component/Employee Section/Dashboard/Page.jsx";
 import AddUserForm from "@/Component/Employee Section/Employee/AddUserForm.jsx";
 import TeamPerformance from "@/Component/Reports/TeamPerformance/Page.jsx";
+
 import {useEffect, useMemo, useState} from "react";
 import axios from "axios";
-import {startTokenRefresher, stopTokenRefresher} from "@/lib/tokenRefresher.js";
+import {
+    startTokenRefresher,
+    stopTokenRefresher,
+} from "@/lib/tokenRefresher.js";
 import {useActiveProjects} from "@/hooks/useActiveProjects.js";
 import {getCurrentRole} from "@/Utils/navigation.js";
 
@@ -154,11 +164,13 @@ function App() {
                                 }
                             />
 
-                            {/* Project canonical routes (SA/ADMIN/MANAGER) */}
+                            {/* Project canonical routes (SA/ADMIN/MANAGER/EMPLOYEE) */}
                             <Route
                                 path="/project"
                                 element={
-                                    <RoleGate allowed={["SUPER-ADMIN", "ADMIN", "MANAGER","EMPLOYEE"]}>
+                                    <RoleGate
+                                        allowed={["SUPER-ADMIN", "ADMIN", "MANAGER", "EMPLOYEE"]}
+                                    >
                                         <ProjectIndexRedirect/>
                                     </RoleGate>
                                 }
@@ -166,12 +178,14 @@ function App() {
                             <Route
                                 path="/project/:projectId"
                                 element={
-                                    <RoleGate allowed={["SUPER-ADMIN", "ADMIN", "MANAGER","EMPLOYEE"]}>
+                                    <RoleGate
+                                        allowed={["SUPER-ADMIN", "ADMIN", "MANAGER", "EMPLOYEE"]}
+                                    >
                                         <ProjectDashboardPage/>
                                     </RoleGate>
                                 }
                             />
-                            {/* Optional alias /board for same audience + EMPLOYEE view access */}
+                            {/* Optional alias /board */}
                             <Route
                                 path="/board"
                                 element={
@@ -187,7 +201,9 @@ function App() {
                             <Route
                                 path="/calendar"
                                 element={
-                                    <RoleGate allowed={["SUPER-ADMIN", "ADMIN", "MANAGER"]}>
+                                    <RoleGate
+                                        allowed={["SUPER-ADMIN", "ADMIN", "MANAGER"]}
+                                    >
                                         <Calendar/>
                                     </RoleGate>
                                 }
@@ -195,7 +211,9 @@ function App() {
                             <Route
                                 path="/attendance"
                                 element={
-                                    <RoleGate allowed={["SUPER-ADMIN", "ADMIN", "MANAGER"]}>
+                                    <RoleGate
+                                        allowed={["SUPER-ADMIN", "ADMIN", "MANAGER"]}
+                                    >
                                         <Attendance/>
                                     </RoleGate>
                                 }
@@ -205,7 +223,9 @@ function App() {
                             <Route
                                 path="/project/add"
                                 element={
-                                    <RoleGate allowed={["SUPER-ADMIN", "ADMIN", "EMPLOYEE", "MANAGER"]}>
+                                    <RoleGate
+                                        allowed={["SUPER-ADMIN", "ADMIN", "EMPLOYEE", "MANAGER"]}
+                                    >
                                         <ProjectAdd/>
                                     </RoleGate>
                                 }
@@ -213,17 +233,21 @@ function App() {
                             <Route
                                 path="/project/scrum"
                                 element={
-                                    <RoleGate allowed={["SUPER-ADMIN", "ADMIN", "MANAGER", "EMPLOYEE"]}>
+                                    <RoleGate
+                                        allowed={["SUPER-ADMIN", "ADMIN", "MANAGER", "EMPLOYEE"]}
+                                    >
                                         <ScrumPage/>
                                     </RoleGate>
                                 }
                             />
 
-                            {/* Organisation → SA/ADMIN */}
+                            {/* Organisation → SA/ADMIN/MANAGER */}
                             <Route
                                 path="/team"
                                 element={
-                                    <RoleGate allowed={["SUPER-ADMIN", "ADMIN", "MANAGER"]}>
+                                    <RoleGate
+                                        allowed={["SUPER-ADMIN", "ADMIN", "MANAGER"]}
+                                    >
                                         <Org/>
                                     </RoleGate>
                                 }
@@ -231,7 +255,9 @@ function App() {
                             <Route
                                 path="/team/departments"
                                 element={
-                                    <RoleGate allowed={["SUPER-ADMIN", "ADMIN","MANAGER"]}>
+                                    <RoleGate
+                                        allowed={["SUPER-ADMIN", "ADMIN", "MANAGER"]}
+                                    >
                                         <DepartmentsPage/>
                                     </RoleGate>
                                 }
@@ -239,7 +265,9 @@ function App() {
                             <Route
                                 path="/team/org/sub-departments"
                                 element={
-                                    <RoleGate allowed={["SUPER-ADMIN", "ADMIN","MANAGER"]}>
+                                    <RoleGate
+                                        allowed={["SUPER-ADMIN", "ADMIN", "MANAGER"]}
+                                    >
                                         <SubDepartmentsPage/>
                                     </RoleGate>
                                 }
@@ -247,7 +275,9 @@ function App() {
                             <Route
                                 path="/team/org/designations"
                                 element={
-                                    <RoleGate allowed={["SUPER-ADMIN", "ADMIN","MANAGER"]}>
+                                    <RoleGate
+                                        allowed={["SUPER-ADMIN", "ADMIN", "MANAGER"]}
+                                    >
                                         <DesignationsPage/>
                                     </RoleGate>
                                 }
@@ -255,7 +285,9 @@ function App() {
                             <Route
                                 path="/team/org/quick-add"
                                 element={
-                                    <RoleGate allowed={["SUPER-ADMIN", "ADMIN","MANAGER"]}>
+                                    <RoleGate
+                                        allowed={["SUPER-ADMIN", "ADMIN", "MANAGER"]}
+                                    >
                                         <QuickAddPage/>
                                     </RoleGate>
                                 }
@@ -265,7 +297,9 @@ function App() {
                             <Route
                                 path="/employees-section/dashboard"
                                 element={
-                                    <RoleGate allowed={["SUPER-ADMIN", "ADMIN", "MANAGER"]}>
+                                    <RoleGate
+                                        allowed={["SUPER-ADMIN", "ADMIN", "MANAGER"]}
+                                    >
                                         <EmployeeDashboard/>
                                     </RoleGate>
                                 }
@@ -273,7 +307,9 @@ function App() {
                             <Route
                                 path="/employees-section/add"
                                 element={
-                                    <RoleGate allowed={["SUPER-ADMIN", "ADMIN","MANAGER"]}>
+                                    <RoleGate
+                                        allowed={["SUPER-ADMIN", "ADMIN", "MANAGER"]}
+                                    >
                                         <AddUserForm/>
                                     </RoleGate>
                                 }
@@ -283,7 +319,9 @@ function App() {
                             <Route
                                 path="/reports"
                                 element={
-                                    <RoleGate allowed={["SUPER-ADMIN", "ADMIN", "MANAGER"]}>
+                                    <RoleGate
+                                        allowed={["SUPER-ADMIN", "ADMIN", "MANAGER"]}
+                                    >
                                         <TeamPerformance/>
                                     </RoleGate>
                                 }
@@ -305,7 +343,7 @@ function App() {
             <TooltipProvider>
                 <Toaster/>
                 <Sonner/>
-                <BrowserRouter>
+                <HashRouter>
                     <Routes>
                         {/* Public route */}
                         <Route
@@ -322,7 +360,7 @@ function App() {
                             }
                         />
                     </Routes>
-                </BrowserRouter>
+                </HashRouter>
             </TooltipProvider>
         </QueryClientProvider>
     );
