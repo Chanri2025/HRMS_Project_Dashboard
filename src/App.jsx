@@ -17,7 +17,7 @@ import RouteAwareHeader from "@/Utils/RouteAwareHeader.jsx";
 import Page from "@/Component/Dashboard/Page.jsx";
 import ProjectDashboardPage from "@/Component/ProjectSection/ProjectDashboard/Page.jsx";
 import ProjectAdd from "@/Component/ProjectSection/ProjectAdd/Page.jsx";
-import ScrumPage from "@/Component/ProjectSection/Scrum/Page.jsx";
+import ScrumPage from "@/Component/ProjectSection/ScrumDashboard/Page.jsx";
 import Calendar from "@/Component/Calender/Page.jsx";
 import Attendance from "@/Component/Attendance/Page.jsx";
 import NotFound from "@/Utils/NotFound.jsx";
@@ -232,6 +232,16 @@ function App() {
                             />
                             <Route
                                 path="/project/scrum"
+                                element={
+                                    <RoleGate
+                                        allowed={["SUPER-ADMIN", "ADMIN", "MANAGER", "EMPLOYEE"]}
+                                    >
+                                        <ScrumPage/>
+                                    </RoleGate>
+                                }
+                            />
+                            <Route
+                                path="/scrum"
                                 element={
                                     <RoleGate
                                         allowed={["SUPER-ADMIN", "ADMIN", "MANAGER", "EMPLOYEE"]}

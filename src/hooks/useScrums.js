@@ -4,10 +4,49 @@ import {toast} from "sonner";
 import {http, getUserCtx} from "@/lib/http";
 import {errText} from "@/lib/errText";
 
+const PRIVILEGED_ROLES = ["SUPER-ADMIN", "ADMIN", "MANAGER"];
+
+// Small helper: get id + role from ctx OR sessionStorage
+function resolveUserMeta() {
+    const ctx = getUserCtx() || {};
+
+    let accessToken = ctx?.accessToken || ctx?.access_token || "";
+    let baseUser = ctx?.user || ctx || {};
+
+    let userId = baseUser?.user_id ?? baseUser?.id ?? null;
+    let role = baseUser?.role ?? null;
+
+    // Fallback to sessionStorage.userData
+    try {
+        const raw = sessionStorage.getItem("userData");
+        if (raw) {
+            const parsed = JSON.parse(raw);
+
+            if (!userId) {
+                userId = parsed.user_id ?? parsed.id ?? null;
+            }
+            if (!role) {
+                role = parsed.role ?? null;
+            }
+            if (!accessToken) {
+                accessToken = parsed.access_token || accessToken;
+            }
+        }
+    } catch {
+        // ignore JSON / access errors
+    }
+
+    return {
+        accessToken,
+        userId,
+        role: role ? String(role).toUpperCase() : "",
+    };
+}
+
 // ✅ Get all users (for id → name mapping)
 export function useUsers(enabled = true) {
     const {accessToken} = getUserCtx();
-    const canRun = Boolean(enabled && accessToken);
+    const canRun = Boolean(accessToken && enabled);
 
     return useQuery({
         queryKey: ["users"],
@@ -23,20 +62,30 @@ export function useUsers(enabled = true) {
     });
 }
 
-// ✅ Get all scrums (always include work_hours)
+// ✅ Get scrums (role-aware: user_id only for non-privileged roles)
 export function useScrums() {
-    const {accessToken} = getUserCtx();
+    const {accessToken, userId, role} = resolveUserMeta();
+
     const enabled = Boolean(accessToken);
+    const isPrivileged = PRIVILEGED_ROLES.includes(role);
+    const shouldFilterByUser = !isPrivileged;
+
+    // Always include_hours, and for non-privileged send a concrete user_id
+    const params = {
+        include_hours: true,
+        ...(shouldFilterByUser ? {user_id: userId ?? -1} : {}),
+    };
+
+    // Make queryKey depend on role + user, so cache stays correct
+    const queryKey = ["scrums", isPrivileged ? "ALL" : (userId ?? "UNKNOWN")];
 
     return useQuery({
-        queryKey: ["scrums"],
+        queryKey,
         enabled,
         queryFn: async () => {
             const res = await http.get("/scrums", {
                 headers: {Authorization: `Bearer ${accessToken}`},
-                params: {
-                    include_hours: true, // 👈 always ask backend to calculate hours
-                },
+                params,
             });
 
             const arr = Array.isArray(res.data)
@@ -89,7 +138,7 @@ export function useCreateScrum() {
             return res.data;
         },
         onSuccess: () => {
-            toast.success("Scrum added successfully");
+            toast.success("ScrumDashboard added successfully");
             qc.invalidateQueries({queryKey: ["scrums"]});
         },
         onError: (error) => {
@@ -101,13 +150,24 @@ export function useCreateScrum() {
 // ✅ Lifecycle: POST /scrums/{scrum_id}/lifecycle
 // action: 'start' | 'pause' | 'end'
 export function useScrumLifecycle() {
-    const ctx = getUserCtx();
-    const accessToken = ctx?.accessToken || "";
+    const ctx = getUserCtx() || {};
+    const accessToken = ctx?.accessToken || ctx?.access_token || "";
     const qc = useQueryClient();
 
-    // try to extract actor_id from logged-in user
-    const actorIdDefault =
-        ctx?.user?.user_id || ctx?.user?.id || ctx?.user_id || null;
+    // try to extract actor_id from logged-in user or sessionStorage
+    let actorIdDefault =
+        ctx?.user?.user_id || ctx?.user?.id || ctx?.user_id || ctx?.id || null;
+
+    if (!actorIdDefault) {
+        try {
+            const raw = sessionStorage.getItem("userData");
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                actorIdDefault = parsed.user_id ?? parsed.id ?? null;
+            }
+        } catch {
+        }
+    }
 
     return useMutation({
         mutationFn: async ({scrumId, action, note}) => {
@@ -116,9 +176,9 @@ export function useScrumLifecycle() {
             if (!action) throw new Error("Missing lifecycle action");
 
             const payload = {
-                action,                        // 'start' | 'pause' | 'end'
-                note: note ?? null,            // optional
-                actor_id: actorIdDefault ?? undefined, // optional
+                action,
+                note: note ?? null,
+                actor_id: actorIdDefault ?? undefined,
             };
 
             const res = await http.post(
@@ -134,12 +194,12 @@ export function useScrumLifecycle() {
             const act = variables.action;
             const label =
                 act === "start"
-                    ? "Scrum started"
+                    ? "ScrumDashboard started"
                     : act === "pause"
-                        ? "Scrum paused"
+                        ? "ScrumDashboard paused"
                         : act === "end"
-                            ? "Scrum completed"
-                            : "Scrum updated";
+                            ? "ScrumDashboard completed"
+                            : "ScrumDashboard updated";
 
             toast.success(label);
             qc.invalidateQueries({queryKey: ["scrums"]});

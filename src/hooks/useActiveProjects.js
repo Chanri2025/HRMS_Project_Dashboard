@@ -4,7 +4,46 @@ import {toast} from "sonner";
 import {http, getUserCtx} from "@/lib/http";
 import {errText} from "@/lib/errText";
 
+// ---------- Members Normalizer (uses new project_members format) ----------
+function normalizeProjectMember(row = {}) {
+    const userId =
+        row.user_id ??
+        row.userId ??
+        row.id ??
+        null;
+
+    return {
+        userId,
+        projectId: row.project_id ?? row.projectId ?? null,
+        designationId:
+            row.designation_id ??
+            row.designationId ??
+            undefined,
+        addedOn: row.added_on ?? row.addedOn ?? null,
+
+        // These will usually be filled via useUserLabel / user API
+        fullName:
+            row.full_name ||
+            row.name ||
+            row.employee?.full_name ||
+            "",
+        email: row.email || row.employee?.email || "",
+        deptId:
+            row.dept_id ??
+            row.department_id ??
+            row.deptId ??
+            undefined,
+    };
+}
+
+// ---------- Project Normalizer (now also pulls project_members) ----------
 function normalizeProject(row = {}) {
+    const rawMembers = Array.isArray(row.project_members)
+        ? row.project_members
+        : [];
+
+    const normalizedMembers = rawMembers.map(normalizeProjectMember);
+
     return {
         id: row.project_id ?? row.id,
         name: row.project_name ?? row.name ?? "Project",
@@ -13,10 +52,18 @@ function normalizeProject(row = {}) {
         createdOn: row.created_on || row.createdAt || null,
         lastModified: row.last_modified || row.updatedAt || null,
         createdById: row.created_by ?? row.createdBy ?? null,
+
+        // subprojects (unchanged)
         subprojects: Array.isArray(row.subprojects) ? row.subprojects : [],
+
+        // NEW: members from embedded project_members
+        // keep both names for backward compatibility
+        members: normalizedMembers,
+        projectMembers: normalizedMembers,
     };
 }
 
+// ---------- Active Projects List ----------
 export function useActiveProjects() {
     const ctx = getUserCtx();
     const accessToken = ctx?.accessToken || "";
@@ -28,6 +75,8 @@ export function useActiveProjects() {
         queryFn: async () => {
             const res = await http.get("/projects", {
                 headers: {Authorization: `Bearer ${accessToken}`},
+                // If you want to filter by user:
+                // params: { user_id: ctx?.user?.id }
             });
 
             const arr = Array.isArray(res.data)
@@ -52,7 +101,7 @@ export function useActiveProjects() {
     };
 }
 
-// Single project (with subprojects) from /projects/{id}
+// ---------- Single Project (with subprojects & members) ----------
 export function useProjectById(projectId) {
     const ctx = getUserCtx();
     const accessToken = ctx?.accessToken || "";
@@ -97,35 +146,7 @@ export function useUserById(userId) {
     });
 }
 
-// ---------- Project Members ----------
-
-function normalizeProjectMember(row = {}) {
-    const userId =
-        row.user_id ??
-        row.userId ??
-        row.id ??
-        null;
-
-    return {
-        userId,
-        fullName:
-            row.full_name ||
-            row.name ||
-            row.employee?.full_name ||
-            "",
-        email: row.email || row.employee?.email || "",
-        designationId:
-            row.designation_id ??
-            row.designationId ??
-            undefined,
-        deptId:
-            row.dept_id ??
-            row.department_id ??
-            row.deptId ??
-            undefined,
-    };
-}
-
+// ---------- Project Members (now reads from /projects/:id) ----------
 export function useProjectMembers(projectId) {
     const ctx = getUserCtx();
     const accessToken = ctx?.accessToken || "";
@@ -134,13 +155,14 @@ export function useProjectMembers(projectId) {
         queryKey: ["projects", projectId, "members"],
         enabled: Boolean(accessToken) && Boolean(projectId),
         queryFn: async () => {
-            const res = await http.get(`/projects/${projectId}/members`, {
+            const res = await http.get(`/projects/${projectId}`, {
                 headers: {Authorization: `Bearer ${accessToken}`},
             });
 
-            const arr = Array.isArray(res.data)
-                ? res.data
-                : res.data?.data || [];
+            const data = res.data?.data ?? res.data ?? {};
+            const arr = Array.isArray(data.project_members)
+                ? data.project_members
+                : [];
 
             return arr.map(normalizeProjectMember);
         },
@@ -150,7 +172,6 @@ export function useProjectMembers(projectId) {
 }
 
 // ---------- Mutations: Projects ----------
-
 export function useUpdateProject() {
     const ctx = getUserCtx();
     const accessToken = ctx?.accessToken || "";
@@ -204,8 +225,7 @@ export function useDeleteProject() {
     });
 }
 
-// ---------- Mutations: Members ----------
-
+// ---------- Mutations: Members (assumes your POST/DELETE endpoints are same) ----------
 export function useAddProjectMember() {
     const ctx = getUserCtx();
     const accessToken = ctx?.accessToken || "";
@@ -255,6 +275,8 @@ export function useAddProjectMember() {
         },
         onSuccess: (_, {projectId}) => {
             toast.success("Member added to project");
+            // refresh both project + members cache
+            queryClient.invalidateQueries(["projects", projectId]);
             queryClient.invalidateQueries(["projects", projectId, "members"]);
         },
         onError: (error) => {
@@ -290,6 +312,7 @@ export function useRemoveProjectMember() {
         },
         onSuccess: (_, {projectId}) => {
             toast.success("Member removed from project");
+            queryClient.invalidateQueries(["projects", projectId]);
             queryClient.invalidateQueries(["projects", projectId, "members"]);
         },
         onError: (error) => {
@@ -298,8 +321,7 @@ export function useRemoveProjectMember() {
     });
 }
 
-// ---------- New: Create Sub Project ----------
-
+// --- Create Sub Project: POST /sub-projects
 export function useCreateSubProject() {
     const ctx = getUserCtx();
     const accessToken = ctx?.accessToken || "";
@@ -333,26 +355,24 @@ export function useCreateSubProject() {
 
 // --- Create Project: POST /projects
 export function useCreateProject() {
-  const ctx = getUserCtx();
-  const accessToken = ctx?.accessToken || "";
-  const queryClient = useQueryClient();
+    const ctx = getUserCtx();
+    const accessToken = ctx?.accessToken || "";
+    const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (payload) => {
-      if (!accessToken) throw new Error("No access token");
-      const res = await http.post("/projects", payload, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      return res.data;
-    },
-    onSuccess: () => {
-      toast.success("Project created successfully");
-      // refresh lists
-      queryClient.invalidateQueries(["projects", "all"]);
-    },
-    onError: (error) => {
-      toast.error(errText(error) || "Failed to create project");
-    },
-  });
+    return useMutation({
+        mutationFn: async (payload) => {
+            if (!accessToken) throw new Error("No access token");
+            const res = await http.post("/projects", payload, {
+                headers: {Authorization: `Bearer ${accessToken}`},
+            });
+            return res.data;
+        },
+        onSuccess: () => {
+            toast.success("Project created successfully");
+            queryClient.invalidateQueries(["projects", "all"]);
+        },
+        onError: (error) => {
+            toast.error(errText(error) || "Failed to create project");
+        },
+    });
 }
-

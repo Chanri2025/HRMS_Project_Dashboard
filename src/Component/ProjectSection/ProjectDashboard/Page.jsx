@@ -1,3 +1,4 @@
+// src/Component/ProjectSection/ProjectDashboard/Page.jsx
 import React, {useState, useMemo, useEffect} from "react";
 import {useParams, useNavigate, useSearchParams} from "react-router-dom";
 
@@ -34,7 +35,7 @@ import {
 } from "@/hooks/useActiveProjects.js";
 
 import {
-    SubProjectCreateDialog
+    SubProjectCreateDialog,
 } from "@/Component/ProjectSection/ProjectDashboard/ProjectHeader/SubProjectCreateDialog.jsx";
 import {useUpdateSubProjectStatus} from "@/hooks/useSubProjects.js";
 import {useProjectSelection} from "@/hooks/useProjectSelection.js";
@@ -90,7 +91,7 @@ function mapSubprojectsToTasks(subprojects = []) {
                     sp.created_on ||
                     sp.createdOn ||
                     sp.created_at ||
-                    sp.createdAt
+                    sp.createdAt,
                 )
                 : new Date();
 
@@ -101,7 +102,7 @@ function mapSubprojectsToTasks(subprojects = []) {
                 ? new Date(
                     sp.subproject_deadline ||
                     sp.deadline ||
-                    sp.endDate
+                    sp.endDate,
                 )
                 : start;
 
@@ -180,7 +181,9 @@ export default function Page() {
     useEffect(() => {
         if (projectsLoading) return;
         if (!activeProjects?.length) return;
-        const exists = activeProjects.some(p => String(p.id) === String(routeProjectId));
+        const exists = activeProjects.some(
+            (p) => String(p.id) === String(routeProjectId),
+        );
         if (!exists) {
             navigate(`/project/${activeProjects[0].id}`, {replace: true});
         }
@@ -193,12 +196,13 @@ export default function Page() {
     } = useProjectById(routeProjectId || projectId);
 
     const baseSelectedProject =
-        activeProjects?.find((p) => String(p.id) === String(routeProjectId || projectId)) ||
-        null;
+        activeProjects?.find(
+            (p) => String(p.id) === String(routeProjectId || projectId),
+        ) || null;
 
     const selectedProject = detailedProject || baseSelectedProject || null;
 
-    // Members for create dialog
+    // Members for create dialog (now using embedded project_members)
     const {data: membersData} = useProjectMembers(selectedProject?.id, {
         enabled: !!selectedProject?.id,
     });
@@ -206,7 +210,9 @@ export default function Page() {
     const projectMembers =
         membersData?.members ||
         membersData ||
+        selectedProject?.projectMembers ||
         selectedProject?.members ||
+        selectedProject?.project_members ||
         [];
 
     // Build tasks whenever selectedProject changes
@@ -229,7 +235,7 @@ export default function Page() {
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {distance: 8},
-        })
+        }),
     );
 
     const tasksByStatus = useMemo(
@@ -239,7 +245,7 @@ export default function Page() {
             inProgress: tasks.filter((t) => t.status === "in-progress"),
             done: tasks.filter((t) => t.status === "done"),
         }),
-        [tasks]
+        [tasks],
     );
 
     const {mutate: mutateStatus} = useUpdateSubProjectStatus();
@@ -277,8 +283,8 @@ export default function Page() {
                 prev.map((task) =>
                     task.id === activeTask.id
                         ? {...task, status: overContainer}
-                        : task
-                )
+                        : task,
+                ),
             );
 
             if (project_status) {
@@ -328,7 +334,11 @@ export default function Page() {
                 projectMembers={projectMembers}
             />
 
-            <Tabs value={view} onValueChange={setView} className="flex-1 flex flex-col">
+            <Tabs
+                value={view}
+                onValueChange={setView}
+                className="flex-1 flex flex-col"
+            >
                 <div className="border-b px-6 py-2">
                     <TabsList>
                         <TabsTrigger value="kanban">Kanban</TabsTrigger>

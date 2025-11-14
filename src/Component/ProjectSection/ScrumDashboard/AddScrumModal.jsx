@@ -222,7 +222,7 @@ export const AddScrumModal = () => {
                             Cancel
                         </Button>
                         <Button onClick={handleSubmit} disabled={isSubmitDisabled}>
-                            {createScrum.isLoading ? "Saving..." : "Save Scrum"}
+                            {createScrum.isLoading ? "Saving..." : "Save ScrumDashboard"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

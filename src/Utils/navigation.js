@@ -8,6 +8,7 @@ import {
     BarChart3,
     UserCog,
     Target,
+    Presentation
 } from "lucide-react";
 
 /** Role constants */
@@ -53,6 +54,12 @@ export const MENU = [
     {
         title: "Project Page",
         url: "/board",
+        icon: Presentation,
+        allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER", "EMPLOYEE"],
+    },
+    {
+        title: "Scrum Dashboard Dashboard",
+        url: "/scrum",
         icon: KanbanSquare,
         allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER", "EMPLOYEE"],
     },
@@ -85,7 +92,7 @@ export const MENU = [
                 allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER"],
             },
             {
-                title: "Scrum Dashboard",
+                title: "Scrum Dashboard Dashboard",
                 url: "/project/scrum",
                 allowedRoles: ["SUPER-ADMIN", "ADMIN", "MANAGER", "EMPLOYEE"],
             },

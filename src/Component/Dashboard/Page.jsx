@@ -1,3 +1,4 @@
+// src/Component/Dashboard/Page.jsx
 import React, {useMemo} from "react";
 import {useNavigate} from "react-router-dom";
 import {
@@ -5,6 +6,7 @@ import {
     ListChecks,
     Users,
     CheckCircle2,
+    ArrowRight,
 } from "lucide-react";
 
 import {MetricStatCard} from "./MetricStatCard";
@@ -19,9 +21,13 @@ import {useScrums} from "@/hooks/useScrums";
 import {useMe} from "@/hooks/useMe";
 
 import {DashboardHeader} from "./DashboardHeader";
-import {AddScrumModal} from "@/Component/ProjectSection/Scrum/AddScrumModal";
+import {AddScrumModal} from "@/Component/ProjectSection/ScrumDashboard/AddScrumModal";
 
-// date helpers you shared earlier
+// role helper + button
+import {getCurrentRole} from "@/Utils/navigation";
+import {Button} from "@/components/ui/button";
+
+// date helpers
 import {
     parseCreatedOn,
     formatRange,
@@ -34,6 +40,11 @@ const Page = () => {
     // ---------- Me ----------
     const {data: me} = useMe(true);
     const currentUserId = me?.user_id;
+
+    // ---------- Role-based flags ----------
+    const role = getCurrentRole(); // SUPER-ADMIN / ADMIN / MANAGER / EMPLOYEE / USER
+    const canViewScrum = ["SUPER-ADMIN", "ADMIN", "MANAGER"].includes(role);
+    const isPrivileged = canViewScrum; // same roles
 
     // ---------- Dept members ----------
     const {
@@ -66,7 +77,6 @@ const Page = () => {
     } = useSubProjects();
 
     // ---------- Build sprint info from sub-project statuses ----------
-    // ---------- Build sprint info from sub-project statuses ----------
     const sprintInfo = useMemo(() => {
         const list = Array.isArray(subProjects) ? subProjects : [];
         if (list.length === 0) {
@@ -83,7 +93,6 @@ const Page = () => {
         let inProgress = 0;
         let done = 0;
 
-        // no TS annotations in .jsx
         let startDate = null;
         let endCandidate = null;
 
@@ -95,7 +104,6 @@ const Page = () => {
                     "") + "";
             const s = raw.toLowerCase().trim();
 
-            // buckets
             if (
                 s === "completed" ||
                 s === "done" ||
@@ -111,11 +119,9 @@ const Page = () => {
             ) {
                 inProgress += 1;
             } else {
-                // default to To Do / Backlog
                 todo += 1;
             }
 
-            // dates
             const created =
                 parseCreatedOn(
                     sp.created_on ||
@@ -140,7 +146,6 @@ const Page = () => {
                 }
             }
 
-            // choose best end candidate: prefer deadline, fallback to last_modified
             const candidate = deadline || last;
             if (candidate) {
                 if (!endCandidate || candidate > endCandidate) {
@@ -152,7 +157,6 @@ const Page = () => {
         const total = todo + inProgress + done;
         const progress = total > 0 ? Math.round((done / total) * 100) : 0;
 
-        // Derive sprint status (no union type)
         let status = "Planned";
         if (total === 0) {
             status = "Planned";
@@ -162,7 +166,6 @@ const Page = () => {
             status = "Active";
         }
 
-        // Date range + remaining
         const dateRange =
             startDate && endCandidate
                 ? formatRange(startDate, endCandidate)
@@ -188,7 +191,6 @@ const Page = () => {
             counts: {todo, inProgress, done},
         };
     }, [subProjects]);
-
 
     const {
         totalSubProjects,
@@ -219,17 +221,26 @@ const Page = () => {
         };
     }, [subProjects]);
 
-    // ---------- Scrums (for current user) ----------
+    // ---------- Scrums (role-aware via hook) ----------
     const {
         data: scrums = [],
         isLoading: scrumsLoading,
         isError: scrumsError,
     } = useScrums();
 
-    const myScrumCount = useMemo(() => {
-        if (!Array.isArray(scrums) || !currentUserId) return 0;
-        return scrums.filter((s) => s.user_id === currentUserId).length;
-    }, [scrums, currentUserId]);
+    // For privileged roles → total scrums; others → only own scrums
+    const scrumCount = useMemo(() => {
+        if (!Array.isArray(scrums)) return 0;
+
+        if (isPrivileged) {
+            return scrums.length;
+        }
+
+        if (!currentUserId) return 0;
+        return scrums.filter(
+            (s) => String(s.user_id) === String(currentUserId)
+        ).length;
+    }, [scrums, currentUserId, isPrivileged]);
 
     // ---------- Metrics ----------
     const metrics = useMemo(
@@ -256,7 +267,7 @@ const Page = () => {
             },
             {
                 id: "myScrums",
-                loading: scrumsLoading || !currentUserId,
+                loading: scrumsLoading || (!isPrivileged && !currentUserId),
                 icon: <ListChecks className="h-5 w-5 text-violet-600"/>,
                 iconWrapClass: "bg-violet-100 rounded-full",
                 badgeText: scrumsLoading
@@ -268,12 +279,12 @@ const Page = () => {
                     ? "bg-rose-100 text-rose-600 border-rose-200"
                     : "bg-violet-50 text-violet-700 border-violet-200",
                 value:
-                    scrumsLoading || !currentUserId
+                    scrumsLoading || (!isPrivileged && !currentUserId)
                         ? "—"
                         : scrumsError
                             ? "0"
-                            : String(myScrumCount || 0),
-                label: "My Scrums",
+                            : String(scrumCount || 0),
+                label: isPrivileged ? "All Scrums" : "My Scrums",
             },
             {
                 id: "members",
@@ -322,7 +333,8 @@ const Page = () => {
             projectsError,
             scrumsLoading,
             scrumsError,
-            myScrumCount,
+            scrumCount,
+            isPrivileged,
             currentUserId,
             memberCount,
             membersLoading,
@@ -343,7 +355,25 @@ const Page = () => {
                 ctaLabel="View Projects Page"
                 onCta={() => navigate("/board")}
             >
-                <AddScrumModal/>
+                {canViewScrum ? (
+                    <Button
+                        type="button"
+                        onClick={() => navigate("/project/scrum")}
+                        className="
+                            flex items-center gap-2 px-5 py-2 font-medium text-sm
+                            bg-gradient-to-r from-sky-500 via-indigo-500 to-violet-500
+                            text-white rounded-m shadow-sm
+                            transition-all duration-300 hover:shadow-lg hover:scale-[1.02]
+                            hover:from-sky-600 hover:via-indigo-600 hover:to-violet-600
+                            active:scale-[0.98]
+                        "
+                    >
+                        View Scrum
+                        <ArrowRight className="h-4 w-4"/>
+                    </Button>
+                ) : (
+                    <AddScrumModal/>
+                )}
             </DashboardHeader>
 
             {/* Metric cards */}
